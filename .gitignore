@@ -1,0 +1,38 @@
+# --- Gradle ---
+.gradle/
+build/
+**/build/
+**/.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# --- Android Studio / IntelliJ ---
+.idea/
+*.iml
+local.properties
+captures/
+.cxx/
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Logs ---
+*.log
+
+# --- Keystore (never commit signing keys) ---
+*.jks
+*.keystore
+
+# --- Local AI / helper tool configs ---
+.claude/
+.codex/
+
+# --- Optional: internal planning docs, keep submission repo clean ---
+AGENTS.md
+CLAUDE.md
+docs/PROJECT_SPEC.md
+docs/TASKS.md
+
+# --- Optional: original assignment PDF ---
+docs/reference/2026-Android-TF-Pre-assessment.pdf

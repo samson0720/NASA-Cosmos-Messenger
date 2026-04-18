@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">NASA Cosmos Messenger</string>
+
+    <!-- Tab labels -->
+    <string name="tab_nova">Nova</string>
+    <string name="tab_favorites">收藏</string>
+
+    <!-- Stub screen text (replaced by real screens in later commits) -->
+    <string name="stub_chat">Nova chat — coming next</string>
+    <string name="stub_favorites">Favorites — coming next</string>
+</resources>

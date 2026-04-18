@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Legacy round launcher icon for API 24/25 (pre-adaptive-icon).
+  API 26+ uses mipmap-anydpi-v26/ic_launcher_round.xml instead.
+  Background is a full circle so legacy launchers requesting the round variant
+  get a properly-shaped icon without bitmap masking.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#0B1026"
+        android:pathData="M54,0 A54,54 0 1,0 54,108 A54,54 0 1,0 54,0 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,30 L60.18,46.91 L78,48.09 L64.09,59.18 L68.91,76.36 L54,66.91 L39.09,76.36 L43.91,59.18 L30,48.09 L47.82,46.91 Z" />
+</vector>

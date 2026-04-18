@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Exclude Room database files from auto-backup; favorites/cache will be added in later commits -->
+</full-backup-content>
