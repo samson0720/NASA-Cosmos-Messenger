@@ -6,7 +6,10 @@
     <string name="tab_nova">Nova</string>
     <string name="tab_favorites">收藏</string>
 
+    <!-- Chat screen -->
+    <string name="chat_input_hint">Ask Nova about APOD</string>
+    <string name="chat_send">Send</string>
+
     <!-- Stub screen text (replaced by real screens in later commits) -->
-    <string name="stub_chat">Nova chat — coming next</string>
     <string name="stub_favorites">Favorites — coming next</string>
 </resources>

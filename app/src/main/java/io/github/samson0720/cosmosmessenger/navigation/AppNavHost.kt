@@ -15,7 +15,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import io.github.samson0720.cosmosmessenger.feature.chat.ChatScreen
+import io.github.samson0720.cosmosmessenger.feature.chat.ChatRoute
 import io.github.samson0720.cosmosmessenger.feature.favorites.FavoritesScreen
 
 @Composable
@@ -54,7 +54,7 @@ fun AppNavHost() {
             startDestination = TopLevelDestination.Nova.route,
             modifier = Modifier.padding(padding),
         ) {
-            composable(TopLevelDestination.Nova.route) { ChatScreen() }
+            composable(TopLevelDestination.Nova.route) { ChatRoute() }
             composable(TopLevelDestination.Favorites.route) { FavoritesScreen() }
         }
     }
