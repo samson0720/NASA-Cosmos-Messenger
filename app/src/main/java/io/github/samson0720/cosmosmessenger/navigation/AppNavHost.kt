@@ -1,5 +1,6 @@
 package io.github.samson0720.cosmosmessenger.navigation
 
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -52,7 +53,9 @@ fun AppNavHost() {
         NavHost(
             navController = navController,
             startDestination = TopLevelDestination.Nova.route,
-            modifier = Modifier.padding(padding),
+            modifier = Modifier
+                .padding(padding)
+                .consumeWindowInsets(padding),
         ) {
             composable(TopLevelDestination.Nova.route) { ChatRoute() }
             composable(TopLevelDestination.Favorites.route) { FavoritesScreen() }
