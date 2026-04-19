@@ -11,9 +11,17 @@ object ApodDateParser {
 
     val EARLIEST: LocalDate = LocalDate.of(1995, 6, 16)
 
-    // yyyy/MM/dd or yyyy-MM-dd, 4-digit year, 1-2 digit month/day.
-    // Matched on word boundaries so dates embedded in a sentence still work.
-    private val DATE_REGEX = Regex("""(?<!\d)(\d{4})([-/])(\d{1,2})\2(\d{1,2})(?!\d)""")
+    // yyyy-MM-dd, yyyy/MM/dd, or yyyy.MM.dd — 4-digit year, 1-2 digit
+    // month/day, same separator throughout. Matched on word boundaries
+    // so dates embedded in a sentence still work.
+    private val DATE_REGEX = Regex("""(?<!\d)(\d{4})([-/.])(\d{1,2})\2(\d{1,2})(?!\d)""")
+
+    // Looser detection: "4-digit year, 1-3 non-digit chars, 1-2 digits,
+    // 1-3 non-digit chars, 1-2 digits" — catches clearly date-like but
+    // unsupported inputs (e.g. 2024年01月01日, mixed separators like
+    // 2024-01/01) so the ViewModel surfaces invalid-date guidance
+    // instead of silently fetching today's APOD.
+    private val DATE_LIKE_REGEX = Regex("""(?<!\d)\d{4}\D{1,3}\d{1,2}\D{1,3}\d{1,2}(?!\d)""")
 
     // 'uuuu' (proleptic year) is required instead of 'yyyy' so STRICT
     // resolver style doesn't demand an explicit era pattern.
@@ -21,6 +29,8 @@ object ApodDateParser {
         DateTimeFormatter.ofPattern("uuuu-M-d").withResolverStyle(ResolverStyle.STRICT)
     private val FORMATTER_SLASH: DateTimeFormatter =
         DateTimeFormatter.ofPattern("uuuu/M/d").withResolverStyle(ResolverStyle.STRICT)
+    private val FORMATTER_DOT: DateTimeFormatter =
+        DateTimeFormatter.ofPattern("uuuu.M.d").withResolverStyle(ResolverStyle.STRICT)
 
     private val DISPLAY_FORMATTER: DateTimeFormatter =
         DateTimeFormatter.ofPattern("yyyy/MM/dd")
@@ -35,9 +45,15 @@ object ApodDateParser {
     }
 
     fun extract(input: String, today: LocalDate = LocalDate.now()): DateResult {
-        val match = DATE_REGEX.find(input) ?: return DateResult.None
+        val match = DATE_REGEX.find(input)
+            ?: return if (DATE_LIKE_REGEX.containsMatchIn(input)) DateResult.Malformed
+            else DateResult.None
         val separator = match.groupValues[2]
-        val formatter = if (separator == "-") FORMATTER_DASH else FORMATTER_SLASH
+        val formatter = when (separator) {
+            "-" -> FORMATTER_DASH
+            "/" -> FORMATTER_SLASH
+            else -> FORMATTER_DOT
+        }
         val raw = match.value
         val parsed = runCatching { LocalDate.parse(raw, formatter) }.getOrNull()
             ?: return DateResult.Malformed

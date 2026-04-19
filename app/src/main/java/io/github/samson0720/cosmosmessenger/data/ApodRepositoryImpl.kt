@@ -9,6 +9,7 @@ import retrofit2.HttpException
 import java.io.IOException
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import kotlin.coroutines.cancellation.CancellationException
 
 private const val TAG = "ApodRepo"
 
@@ -33,6 +34,10 @@ class ApodRepositoryImpl(
     } catch (e: IOException) {
         if (BuildConfig.DEBUG) Log.w(TAG, "IO ${e.javaClass.simpleName}")
         Result.failure(ApodException.Network)
+    } catch (e: CancellationException) {
+        // Keep structured concurrency intact — never convert cancellation
+        // into an error reply.
+        throw e
     } catch (e: Throwable) {
         if (BuildConfig.DEBUG) Log.w(TAG, "Unknown ${e.javaClass.simpleName}")
         Result.failure(ApodException.Unknown(e))
