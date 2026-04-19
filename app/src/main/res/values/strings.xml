@@ -7,8 +7,20 @@
     <string name="tab_favorites">收藏</string>
 
     <!-- Chat screen -->
-    <string name="chat_input_hint">Ask Nova about APOD</string>
-    <string name="chat_send">Send</string>
+    <string name="chat_input_hint">輸入日期或訊息</string>
+    <string name="chat_send">傳送</string>
+
+    <!-- Nova replies -->
+    <string name="nova_welcome">你好，我是 Nova。告訴我日期，我就帶你看那天的 NASA 每日天文圖片。</string>
+    <string name="nova_error_too_old">NASA 每日天文圖片自 1995/06/16 開始，請改試更晚的日期。</string>
+    <string name="nova_error_future_date">日期在未來喔，請改試今天或更早的日期。</string>
+    <string name="nova_error_invalid_date">這看起來不是有效的日期，請使用 yyyy/MM/dd 或 yyyy-MM-dd。</string>
+    <string name="nova_error_rate_limited">NASA 目前請求量較大，請稍後再試一次。</string>
+    <string name="nova_error_not_found">這一天沒有 APOD，請換一個日期試試。</string>
+    <string name="nova_error_network">Nova 目前連不上 NASA，請稍後再試一次。</string>
+
+    <!-- APOD card actions -->
+    <string name="apod_video_watch">觀看影片</string>
 
     <!-- Stub screen text (replaced by real screens in later commits) -->
     <string name="stub_favorites">Favorites — coming next</string>

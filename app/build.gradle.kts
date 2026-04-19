@@ -1,7 +1,20 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+}
+
+// Load NASA_API_KEY from local.properties without committing it.
+// Falls back to DEMO_KEY so the project still builds on a fresh checkout.
+val nasaApiKey: String = run {
+    val props = Properties()
+    val file = rootProject.file("local.properties")
+    if (file.exists()) {
+        file.inputStream().use { props.load(it) }
+    }
+    props.getProperty("NASA_API_KEY")?.takeIf { it.isNotBlank() } ?: "DEMO_KEY"
 }
 
 android {
@@ -17,6 +30,8 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
+
+        buildConfigField("String", "NASA_API_KEY", "\"$nasaApiKey\"")
     }
 
     buildTypes {
@@ -32,6 +47,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // java.time is API 26+; desugar for minSdk 24.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -40,6 +57,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {
@@ -62,6 +80,15 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.core)
+
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.converter.moshi)
+    implementation(libs.okhttp)
+    implementation(libs.moshi)
+    implementation(libs.moshi.kotlin)
+    implementation(libs.coil.compose)
+
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

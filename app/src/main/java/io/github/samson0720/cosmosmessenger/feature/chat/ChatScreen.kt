@@ -1,5 +1,6 @@
 package io.github.samson0720.cosmosmessenger.feature.chat
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -21,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -30,13 +32,18 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import io.github.samson0720.cosmosmessenger.R
-import io.github.samson0720.cosmosmessenger.feature.chat.model.ApodPayload
+import io.github.samson0720.cosmosmessenger.feature.chat.model.ApodCard
+import io.github.samson0720.cosmosmessenger.feature.chat.model.ChatContent
 import io.github.samson0720.cosmosmessenger.feature.chat.model.ChatMessage
 import io.github.samson0720.cosmosmessenger.feature.chat.model.Sender
 import io.github.samson0720.cosmosmessenger.ui.theme.CosmosMessengerTheme
@@ -44,7 +51,7 @@ import io.github.samson0720.cosmosmessenger.ui.theme.CosmosMessengerTheme
 @Composable
 fun ChatRoute(
     modifier: Modifier = Modifier,
-    viewModel: ChatViewModel = viewModel(),
+    viewModel: ChatViewModel = viewModel(factory = ChatViewModel.Factory),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     ChatScreen(
@@ -100,6 +107,8 @@ fun ChatScreen(
 @Composable
 private fun MessageRow(message: ChatMessage) {
     val isUser = message.sender == Sender.User
+    // Nova cards need a bit more room for the image; user bubbles stay compact.
+    val maxWidth = if (isUser) 280.dp else 300.dp
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
@@ -107,7 +116,7 @@ private fun MessageRow(message: ChatMessage) {
         Bubble(
             message = message,
             isUser = isUser,
-            modifier = Modifier.widthIn(max = 280.dp),
+            modifier = Modifier.widthIn(max = maxWidth),
         )
     }
 }
@@ -137,26 +146,73 @@ private fun Bubble(
         contentColor = content,
         tonalElevation = 1.dp,
     ) {
-        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-            if (message.apod != null) {
-                ApodPlaceholder(payload = message.apod)
-                Spacer(Modifier.height(6.dp))
-            }
-            Text(
-                text = message.text,
+        when (val c = message.content) {
+            is ChatContent.Text -> Text(
+                text = c.text,
                 style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            )
+            is ChatContent.ApodImage -> ApodImageCard(card = c.card)
+            is ChatContent.ApodVideo -> ApodVideoCard(card = c.card)
+        }
+    }
+}
+
+@Composable
+private fun ApodImageCard(card: ApodCard) {
+    Column {
+        if (card.imageUrl != null) {
+            AsyncImage(
+                model = card.imageUrl,
+                contentDescription = card.title,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+            ApodHeader(card = card)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = card.explanation,
+                style = MaterialTheme.typography.bodySmall,
             )
         }
     }
 }
 
-// Minimal placeholder. A proper APOD card lands in a later step.
 @Composable
-private fun ApodPlaceholder(payload: ApodPayload) {
-    Column {
-        Text(text = payload.title, style = MaterialTheme.typography.titleSmall)
-        Text(text = payload.date, style = MaterialTheme.typography.labelSmall)
+private fun ApodVideoCard(card: ApodCard) {
+    val uriHandler = LocalUriHandler.current
+    Column(modifier = Modifier.padding(12.dp)) {
+        ApodHeader(card = card)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = card.explanation,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.apod_video_watch),
+            style = MaterialTheme.typography.labelLarge.copy(
+                textDecoration = TextDecoration.Underline,
+            ),
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.clickable { uriHandler.openUri(card.sourceUrl) },
+        )
     }
+}
+
+@Composable
+private fun ApodHeader(card: ApodCard) {
+    Text(
+        text = card.title,
+        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+    )
+    Text(
+        text = card.displayDate,
+        style = MaterialTheme.typography.labelSmall,
+        // Secondary metadata: soften against the bubble's contentColor.
+        color = LocalContentColor.current.copy(alpha = 0.65f),
+    )
 }
 
 @Composable
@@ -200,9 +256,29 @@ private fun ChatScreenPreview() {
         ChatScreen(
             uiState = ChatUiState(
                 messages = listOf(
-                    ChatMessage(id = "1", sender = Sender.Nova, text = "Hi, I'm Nova."),
-                    ChatMessage(id = "2", sender = Sender.User, text = "Show me APOD for 2024-01-01"),
-                    ChatMessage(id = "3", sender = Sender.Nova, text = "Here you go."),
+                    ChatMessage(
+                        id = "1",
+                        sender = Sender.Nova,
+                        content = ChatContent.Text("你好，我是 Nova。"),
+                    ),
+                    ChatMessage(
+                        id = "2",
+                        sender = Sender.User,
+                        content = ChatContent.Text("2024/01/01"),
+                    ),
+                    ChatMessage(
+                        id = "3",
+                        sender = Sender.Nova,
+                        content = ChatContent.ApodImage(
+                            ApodCard(
+                                title = "Andromeda Galaxy",
+                                displayDate = "2024/01/01",
+                                explanation = "The Andromeda Galaxy is the closest spiral galaxy to our own Milky Way, located roughly 2.5 million light-years away.",
+                                imageUrl = null,
+                                sourceUrl = "https://apod.nasa.gov/",
+                            ),
+                        ),
+                    ),
                 ),
                 inputText = "",
             ),
