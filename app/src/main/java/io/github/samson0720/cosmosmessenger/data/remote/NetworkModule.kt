@@ -14,10 +14,15 @@ object NetworkModule {
 
     private const val BASE_URL = "https://api.nasa.gov/"
 
+    // Chat-style UX: keep waits short. 10s connect covers slow TLS on a
+    // rough network; 12s read gives NASA APOD a little extra grace since
+    // the read (JSON generation upstream) is the usual slow path.
+    // Combined with the single retry in ApodRepositoryImpl, worst-case
+    // latency on a terminal failure stays well under ~45s.
     private val okHttp: OkHttpClient by lazy {
         OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(12, TimeUnit.SECONDS)
             .build()
     }
 
