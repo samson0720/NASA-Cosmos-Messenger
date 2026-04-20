@@ -26,6 +26,19 @@
     <string name="fav_saved">已加入收藏</string>
     <string name="fav_already">已在收藏中</string>
     <string name="fav_save_failed">收藏失敗，請再試一次。</string>
+    <string name="fav_removed">已從收藏移除</string>
+    <string name="fav_delete_failed">刪除失敗，請再試一次。</string>
+    <string name="fav_load_failed">收藏載入失敗，請重新開啟頁面。</string>
+    <string name="fav_delete">刪除</string>
+    <string name="fav_open_image">開啟原圖</string>
+    <string name="fav_open_video">觀看影片</string>
+    <string name="fav_saved_on">收藏於 %1$s</string>
+
+    <!-- Favorites screen -->
+    <string name="favorites_title">我的宇宙收藏</string>
+    <string name="favorites_subtitle">長按 Nova 回覆的 APOD 卡片，就會保存在這裡。</string>
+    <string name="favorites_empty_title">還沒有收藏</string>
+    <string name="favorites_empty_body">回到 Nova，長按一張 NASA APOD 卡片即可加入收藏。</string>
 
     <!-- Stub screen text (replaced by real screens in later commits) -->
     <string name="stub_favorites">Favorites — coming next</string>
