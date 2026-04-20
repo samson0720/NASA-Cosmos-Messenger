@@ -22,6 +22,11 @@
     <!-- APOD card actions -->
     <string name="apod_video_watch">觀看影片</string>
 
+    <!-- Favorite save feedback -->
+    <string name="fav_saved">已加入收藏</string>
+    <string name="fav_already">已在收藏中</string>
+    <string name="fav_save_failed">收藏失敗，請再試一次。</string>
+
     <!-- Stub screen text (replaced by real screens in later commits) -->
     <string name="stub_favorites">Favorites — coming next</string>
 </resources>

@@ -1,6 +1,7 @@
 package io.github.samson0720.cosmosmessenger.feature.chat
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -30,6 +31,8 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,10 +41,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
@@ -52,11 +58,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import io.github.samson0720.cosmosmessenger.R
+import io.github.samson0720.cosmosmessenger.domain.model.Apod
+import io.github.samson0720.cosmosmessenger.domain.model.ApodMediaType
 import io.github.samson0720.cosmosmessenger.feature.chat.model.ApodCard
 import io.github.samson0720.cosmosmessenger.feature.chat.model.ChatContent
 import io.github.samson0720.cosmosmessenger.feature.chat.model.ChatMessage
 import io.github.samson0720.cosmosmessenger.feature.chat.model.Sender
 import io.github.samson0720.cosmosmessenger.ui.theme.CosmosMessengerTheme
+import java.time.LocalDate
 
 @Composable
 fun ChatRoute(
@@ -68,6 +77,8 @@ fun ChatRoute(
         uiState = uiState,
         onInputChange = viewModel::onInputChange,
         onSendClick = viewModel::onSendClick,
+        onApodLongPress = viewModel::onApodLongPress,
+        onFeedbackShown = viewModel::consumeFeedback,
         modifier = modifier,
     )
 }
@@ -77,13 +88,40 @@ fun ChatScreen(
     uiState: ChatUiState,
     onInputChange: (String) -> Unit,
     onSendClick: () -> Unit,
+    onApodLongPress: (ChatMessage) -> Unit,
+    onFeedbackShown: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(uiState.messages.size) {
         if (uiState.messages.isNotEmpty()) {
             listState.animateScrollToItem(uiState.messages.lastIndex)
+        }
+    }
+
+    // Translate the ViewModel's typed FavoriteFeedback into a localized
+    // snackbar string here, at the UI boundary, so the ViewModel itself
+    // stays free of UI strings for this path.
+    val feedback = uiState.feedback
+    val feedbackMessage: String? = when (feedback) {
+        FavoriteFeedback.Saved -> stringResource(R.string.fav_saved)
+        FavoriteFeedback.AlreadyExists -> stringResource(R.string.fav_already)
+        FavoriteFeedback.SaveFailed -> stringResource(R.string.fav_save_failed)
+        null -> null
+    }
+    LaunchedEffect(feedback) {
+        if (feedback != null && feedbackMessage != null) {
+            // finally {} clears feedback even if the user switches tabs
+            // while showSnackbar is still suspended; ChatViewModel is
+            // retained across tabs, so without this the stale message
+            // would replay on return.
+            try {
+                snackbarHostState.showSnackbar(feedbackMessage)
+            } finally {
+                onFeedbackShown()
+            }
         }
     }
 
@@ -101,9 +139,12 @@ fun ChatScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(items = uiState.messages, key = { it.id }) { message ->
-                MessageRow(message = message)
+                MessageRow(message = message, onApodLongPress = onApodLongPress)
             }
         }
+        // Inline above the divider: takes zero height when no snackbar is
+        // visible, so the resting layout is unchanged.
+        SnackbarHost(hostState = snackbarHostState)
         HorizontalDivider()
         ChatInputBar(
             inputText = uiState.inputText,
@@ -115,7 +156,10 @@ fun ChatScreen(
 }
 
 @Composable
-private fun MessageRow(message: ChatMessage) {
+private fun MessageRow(
+    message: ChatMessage,
+    onApodLongPress: (ChatMessage) -> Unit,
+) {
     val isUser = message.sender == Sender.User
     // Nova cards need a bit more room for the image; user bubbles stay compact.
     val maxWidth = if (isUser) 280.dp else 300.dp
@@ -126,6 +170,7 @@ private fun MessageRow(message: ChatMessage) {
         Bubble(
             message = message,
             isUser = isUser,
+            onApodLongPress = onApodLongPress,
             modifier = Modifier.widthIn(max = maxWidth),
         )
     }
@@ -135,6 +180,7 @@ private fun MessageRow(message: ChatMessage) {
 private fun Bubble(
     message: ChatMessage,
     isUser: Boolean,
+    onApodLongPress: (ChatMessage) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val shape = if (isUser) {
@@ -149,8 +195,27 @@ private fun Bubble(
         if (isUser) MaterialTheme.colorScheme.onPrimaryContainer
         else MaterialTheme.colorScheme.onSurfaceVariant
 
+    val isApod = message.content is ChatContent.ApodImage ||
+        message.content is ChatContent.ApodVideo
+    val haptic = LocalHapticFeedback.current
+    // Long press is bound only on APOD bubbles. detectTapGestures (rather
+    // than combinedClickable with a no-op onClick) keeps normal taps inert
+    // and avoids a misleading ripple that would imply tap-interactivity.
+    val gestureModifier = if (isApod) {
+        Modifier.pointerInput(message.id) {
+            detectTapGestures(
+                onLongPress = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onApodLongPress(message)
+                },
+            )
+        }
+    } else {
+        Modifier
+    }
+
     Surface(
-        modifier = modifier,
+        modifier = modifier.then(gestureModifier),
         shape = shape,
         color = container,
         contentColor = content,
@@ -304,6 +369,14 @@ private fun ChatInputBar(
 @Preview(showBackground = true)
 @Composable
 private fun ChatScreenPreview() {
+    val previewApod = Apod(
+        date = LocalDate.of(2024, 1, 1),
+        title = "Andromeda Galaxy",
+        explanation = "The Andromeda Galaxy is the closest spiral galaxy to our own Milky Way.",
+        mediaType = ApodMediaType.IMAGE,
+        url = "https://apod.nasa.gov/apod/image/2401/example.jpg",
+        hdUrl = null,
+    )
     CosmosMessengerTheme {
         ChatScreen(
             uiState = ChatUiState(
@@ -322,13 +395,14 @@ private fun ChatScreenPreview() {
                         id = "3",
                         sender = Sender.Nova,
                         content = ChatContent.ApodImage(
-                            ApodCard(
+                            card = ApodCard(
                                 title = "Andromeda Galaxy",
                                 displayDate = "2024/01/01",
                                 explanation = "The Andromeda Galaxy is the closest spiral galaxy to our own Milky Way, located roughly 2.5 million light-years away.",
                                 imageUrl = null,
                                 sourceUrl = "https://apod.nasa.gov/",
                             ),
+                            payload = previewApod,
                         ),
                     ),
                 ),
@@ -336,6 +410,8 @@ private fun ChatScreenPreview() {
             ),
             onInputChange = {},
             onSendClick = {},
+            onApodLongPress = {},
+            onFeedbackShown = {},
         )
     }
 }

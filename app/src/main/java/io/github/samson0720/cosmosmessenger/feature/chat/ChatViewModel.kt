@@ -11,9 +11,13 @@ import io.github.samson0720.cosmosmessenger.R
 import io.github.samson0720.cosmosmessenger.data.ApodException
 import io.github.samson0720.cosmosmessenger.data.ApodRepository
 import io.github.samson0720.cosmosmessenger.data.ApodRepositoryImpl
+import io.github.samson0720.cosmosmessenger.data.local.DatabaseModule
 import io.github.samson0720.cosmosmessenger.data.remote.NetworkModule
+import io.github.samson0720.cosmosmessenger.data.repository.FavoritesRepositoryImpl
 import io.github.samson0720.cosmosmessenger.domain.model.Apod
 import io.github.samson0720.cosmosmessenger.domain.model.ApodMediaType
+import io.github.samson0720.cosmosmessenger.domain.repository.FavoritesRepository
+import io.github.samson0720.cosmosmessenger.domain.repository.SaveResult
 import io.github.samson0720.cosmosmessenger.feature.chat.model.ApodCard
 import io.github.samson0720.cosmosmessenger.feature.chat.model.ChatContent
 import io.github.samson0720.cosmosmessenger.feature.chat.model.ChatMessage
@@ -27,15 +31,29 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
 
+/**
+ * Result of a favorite-save attempt that the chat screen wants to surface to
+ * the user. Kept as a sealed interface (not a raw String) so the ViewModel
+ * stays free of UI strings; the Composable layer maps each case to a
+ * [stringResource][androidx.compose.ui.res.stringResource].
+ */
+sealed interface FavoriteFeedback {
+    data object Saved : FavoriteFeedback
+    data object AlreadyExists : FavoriteFeedback
+    data object SaveFailed : FavoriteFeedback
+}
+
 data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
     val inputText: String = "",
     val isSending: Boolean = false,
+    val feedback: FavoriteFeedback? = null,
 )
 
 class ChatViewModel(
     application: Application,
     private val repository: ApodRepository,
+    private val favoritesRepository: FavoritesRepository,
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(
@@ -84,6 +102,39 @@ class ChatViewModel(
         }
     }
 
+    /**
+     * Long-press handler for APOD bubbles. Pulls the domain [Apod] payload
+     * straight off the message — never reconstructs it from the display card —
+     * and reports the outcome through [ChatUiState.feedback].
+     */
+    fun onApodLongPress(message: ChatMessage) {
+        val apod = when (val c = message.content) {
+            is ChatContent.ApodImage -> c.payload
+            is ChatContent.ApodVideo -> c.payload
+            is ChatContent.Text -> return
+        }
+        viewModelScope.launch {
+            // runCatching keeps Room/IO exceptions from escaping the coroutine
+            // and lets the UI surface a recoverable snackbar instead of crashing.
+            val feedback = runCatching { favoritesRepository.save(apod) }
+                .fold(
+                    onSuccess = { result ->
+                        when (result) {
+                            SaveResult.Saved -> FavoriteFeedback.Saved
+                            SaveResult.AlreadyExists -> FavoriteFeedback.AlreadyExists
+                        }
+                    },
+                    onFailure = { FavoriteFeedback.SaveFailed },
+                )
+            _uiState.update { it.copy(feedback = feedback) }
+        }
+    }
+
+    /** Called by the UI once it has shown the snackbar for [ChatUiState.feedback]. */
+    fun consumeFeedback() {
+        _uiState.update { it.copy(feedback = null) }
+    }
+
     private suspend fun buildReplyFor(input: String): ChatMessage {
         val dateResult = ApodDateParser.extract(input)
         val target = when (dateResult) {
@@ -118,26 +169,28 @@ class ChatViewModel(
                 // In-chat image uses the standard-resolution `url` to keep
                 // loading snappy; hdUrl is reserved for the open-link action.
                 content = ChatContent.ApodImage(
-                    ApodCard(
+                    card = ApodCard(
                         title = apod.title,
                         displayDate = displayDate,
                         explanation = apod.explanation,
                         imageUrl = apod.url,
                         sourceUrl = apod.hdUrl ?: apod.url,
                     ),
+                    payload = apod,
                 ),
             )
             ApodMediaType.VIDEO, ApodMediaType.OTHER -> ChatMessage(
                 id = newId(),
                 sender = Sender.Nova,
                 content = ChatContent.ApodVideo(
-                    ApodCard(
+                    card = ApodCard(
                         title = apod.title,
                         displayDate = displayDate,
                         explanation = apod.explanation,
                         imageUrl = null,
                         sourceUrl = apod.url,
                     ),
+                    payload = apod,
                 ),
             )
         }
@@ -156,11 +209,14 @@ class ChatViewModel(
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
                     as Application
-                val repository = ApodRepositoryImpl(
+                val apodRepository = ApodRepositoryImpl(
                     service = NetworkModule.apodService,
                     apiKey = BuildConfig.NASA_API_KEY,
                 )
-                ChatViewModel(app, repository)
+                val favoritesRepository = FavoritesRepositoryImpl(
+                    dao = DatabaseModule.get(app).favoriteApodDao(),
+                )
+                ChatViewModel(app, apodRepository, favoritesRepository)
             }
         }
     }
