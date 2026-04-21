@@ -33,6 +33,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -79,6 +80,8 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
@@ -144,6 +147,9 @@ fun ChatScreen(
     var showDatePicker by remember { mutableStateOf(false) }
     var birthdayCardState by remember {
         mutableStateOf<BirthdayCardDialogState?>(null)
+    }
+    var imagePreviewCard by remember {
+        mutableStateOf<ApodCard?>(null)
     }
     val onBirthdayCardClick: (Apod) -> Unit = { apod ->
         birthdayCardState = BirthdayCardDialogState.Loading
@@ -212,6 +218,7 @@ fun ChatScreen(
                     message = message,
                     onApodLongPress = onApodLongPress,
                     onBirthdayCardClick = onBirthdayCardClick,
+                    onImagePreviewClick = { imagePreviewCard = it },
                 )
             }
         }
@@ -256,6 +263,13 @@ fun ChatScreen(
             onShare = { card -> BirthdayCardShareHelper.share(context, card) },
         )
     }
+
+    imagePreviewCard?.let { card ->
+        ApodImagePreviewDialog(
+            card = card,
+            onDismiss = { imagePreviewCard = null },
+        )
+    }
 }
 
 @Composable
@@ -263,6 +277,7 @@ private fun MessageRow(
     message: ChatMessage,
     onApodLongPress: (ChatMessage) -> Unit,
     onBirthdayCardClick: (Apod) -> Unit,
+    onImagePreviewClick: (ApodCard) -> Unit,
 ) {
     val isUser = message.sender == Sender.User
     // User text bubbles stay compact; Nova bubbles hold APOD cards in a narrower frame
@@ -277,6 +292,7 @@ private fun MessageRow(
             isUser = isUser,
             onApodLongPress = onApodLongPress,
             onBirthdayCardClick = onBirthdayCardClick,
+            onImagePreviewClick = onImagePreviewClick,
             modifier = Modifier.widthIn(max = maxWidth),
         )
     }
@@ -288,6 +304,7 @@ private fun Bubble(
     isUser: Boolean,
     onApodLongPress: (ChatMessage) -> Unit,
     onBirthdayCardClick: (Apod) -> Unit,
+    onImagePreviewClick: (ApodCard) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val shape = if (isUser) {
@@ -339,6 +356,11 @@ private fun Bubble(
             is ChatContent.ApodImage -> ApodImageCard(
                 content = c,
                 onBirthdayCardClick = onBirthdayCardClick,
+                onImagePreviewClick = onImagePreviewClick,
+                onImageLongPress = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onApodLongPress(message)
+                },
             )
             is ChatContent.ApodVideo -> ApodVideoCard(card = c.card)
         }
@@ -349,6 +371,8 @@ private fun Bubble(
 private fun ApodImageCard(
     content: ChatContent.ApodImage,
     onBirthdayCardClick: (Apod) -> Unit,
+    onImagePreviewClick: (ApodCard) -> Unit,
+    onImageLongPress: () -> Unit,
 ) {
     val card = content.card
     // Full-bleed hero image: the surrounding Bubble Surface shape already
@@ -361,7 +385,13 @@ private fun ApodImageCard(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(190.dp),
+                    .height(190.dp)
+                    .pointerInput(card.imageUrl) {
+                        detectTapGestures(
+                            onTap = { onImagePreviewClick(card) },
+                            onLongPress = { onImageLongPress() },
+                        )
+                    },
             )
         }
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
@@ -379,6 +409,81 @@ private fun ApodImageCard(
                 contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
             ) {
                 Text(stringResource(R.string.birthday_card_action))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ApodImagePreviewDialog(
+    card: ApodCard,
+    onDismiss: () -> Unit,
+) {
+    val uriHandler = LocalUriHandler.current
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = Color(0xF2070A18),
+            contentColor = Color.White,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 18.dp, vertical = 18.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = card.title,
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                            ),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = card.displayDate,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color.White.copy(alpha = 0.64f),
+                        )
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = stringResource(R.string.apod_image_preview_close),
+                        )
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(vertical = 18.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    AsyncImage(
+                        model = card.sourceUrl,
+                        contentDescription = card.title,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(onClick = { uriHandler.openUri(card.sourceUrl) }) {
+                        Text(stringResource(R.string.apod_image_preview_open))
+                    }
+                }
             }
         }
     }
