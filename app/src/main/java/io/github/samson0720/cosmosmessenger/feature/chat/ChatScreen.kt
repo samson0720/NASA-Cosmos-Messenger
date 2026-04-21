@@ -1,6 +1,7 @@
 package io.github.samson0720.cosmosmessenger.feature.chat
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,6 +22,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -32,6 +36,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
@@ -51,15 +56,18 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalUriHandler
@@ -83,11 +91,15 @@ import io.github.samson0720.cosmosmessenger.feature.chat.model.ApodCard
 import io.github.samson0720.cosmosmessenger.feature.chat.model.ChatContent
 import io.github.samson0720.cosmosmessenger.feature.chat.model.ChatMessage
 import io.github.samson0720.cosmosmessenger.feature.chat.model.Sender
+import io.github.samson0720.cosmosmessenger.feature.chat.starcard.BirthdayCardShareHelper
+import io.github.samson0720.cosmosmessenger.feature.chat.starcard.BirthdayStarCard
+import io.github.samson0720.cosmosmessenger.feature.chat.starcard.BirthdayStarCardRenderer
 import io.github.samson0720.cosmosmessenger.ui.CosmosTopBar
 import io.github.samson0720.cosmosmessenger.ui.theme.CosmosMessengerTheme
 import io.github.samson0720.cosmosmessenger.util.ApodDateParser
 import java.time.LocalDate
 import java.time.YearMonth
+import kotlinx.coroutines.launch
 
 private val BubbleNovaColor = Color(0xCC1E2547)
 private val BubbleNovaBorder = Color(0x406C5CE7)
@@ -125,7 +137,25 @@ fun ChatScreen(
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
     val focusManager = LocalFocusManager.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val renderer = remember(context.applicationContext) {
+        BirthdayStarCardRenderer(context.applicationContext)
+    }
     var showDatePicker by remember { mutableStateOf(false) }
+    var birthdayCardState by remember {
+        mutableStateOf<BirthdayCardDialogState?>(null)
+    }
+    val onBirthdayCardClick: (Apod) -> Unit = { apod ->
+        birthdayCardState = BirthdayCardDialogState.Loading
+        scope.launch {
+            birthdayCardState = runCatching { renderer.render(apod) }
+                .fold(
+                    onSuccess = { BirthdayCardDialogState.Ready(it) },
+                    onFailure = { BirthdayCardDialogState.Error },
+                )
+        }
+    }
 
     LaunchedEffect(uiState.messages.size) {
         if (uiState.messages.isNotEmpty()) {
@@ -179,7 +209,11 @@ fun ChatScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(items = uiState.messages, key = { it.id }) { message ->
-                MessageRow(message = message, onApodLongPress = onApodLongPress)
+                MessageRow(
+                    message = message,
+                    onApodLongPress = onApodLongPress,
+                    onBirthdayCardClick = onBirthdayCardClick,
+                )
             }
         }
         // Inline above the divider: takes zero height when no snackbar is
@@ -215,12 +249,21 @@ fun ChatScreen(
             },
         )
     }
+
+    birthdayCardState?.let { state ->
+        BirthdayCardDialog(
+            state = state,
+            onDismiss = { birthdayCardState = null },
+            onShare = { card -> BirthdayCardShareHelper.share(context, card) },
+        )
+    }
 }
 
 @Composable
 private fun MessageRow(
     message: ChatMessage,
     onApodLongPress: (ChatMessage) -> Unit,
+    onBirthdayCardClick: (Apod) -> Unit,
 ) {
     val isUser = message.sender == Sender.User
     // User text bubbles stay compact; Nova bubbles hold APOD cards in a narrower frame
@@ -234,6 +277,7 @@ private fun MessageRow(
             message = message,
             isUser = isUser,
             onApodLongPress = onApodLongPress,
+            onBirthdayCardClick = onBirthdayCardClick,
             modifier = Modifier.widthIn(max = maxWidth),
         )
     }
@@ -244,6 +288,7 @@ private fun Bubble(
     message: ChatMessage,
     isUser: Boolean,
     onApodLongPress: (ChatMessage) -> Unit,
+    onBirthdayCardClick: (Apod) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val shape = if (isUser) {
@@ -292,14 +337,21 @@ private fun Bubble(
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             )
-            is ChatContent.ApodImage -> ApodImageCard(card = c.card)
+            is ChatContent.ApodImage -> ApodImageCard(
+                content = c,
+                onBirthdayCardClick = onBirthdayCardClick,
+            )
             is ChatContent.ApodVideo -> ApodVideoCard(card = c.card)
         }
     }
 }
 
 @Composable
-private fun ApodImageCard(card: ApodCard) {
+private fun ApodImageCard(
+    content: ChatContent.ApodImage,
+    onBirthdayCardClick: (Apod) -> Unit,
+) {
+    val card = content.card
     // Full-bleed hero image: the surrounding Bubble Surface shape already
     // clips the rounded corners, so no extra clip/shape is needed here.
     Column(modifier = Modifier.border(ApodCardBorder, RoundedCornerShape(16.dp))) {
@@ -322,6 +374,13 @@ private fun ApodImageCard(card: ApodCard) {
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
+            Spacer(Modifier.height(8.dp))
+            TextButton(
+                onClick = { onBirthdayCardClick(content.payload) },
+                contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
+            ) {
+                Text(stringResource(R.string.birthday_card_action))
+            }
         }
     }
 }
@@ -463,6 +522,7 @@ private fun ApodDatePickerDialog(
 ) {
     var selectedDate by remember(maxDate) { mutableStateOf(maxDate) }
     var displayedMonth by remember(maxDate) { mutableStateOf(YearMonth.from(maxDate)) }
+    var choosingYear by remember { mutableStateOf(false) }
     val minMonth = remember(minDate) { YearMonth.from(minDate) }
     val maxMonth = remember(maxDate) { YearMonth.from(maxDate) }
     val canGoPrevious = displayedMonth > minMonth
@@ -475,19 +535,34 @@ private fun ApodDatePickerDialog(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 CalendarMonthHeader(
                     displayedMonth = displayedMonth,
-                    canGoPrevious = canGoPrevious,
-                    canGoNext = canGoNext,
-                    onPrevious = { displayedMonth = displayedMonth.minusMonths(1) },
-                    onNext = { displayedMonth = displayedMonth.plusMonths(1) },
+                    choosingYear = choosingYear,
+                    canGoPrevious = !choosingYear && canGoPrevious,
+                    canGoNext = !choosingYear && canGoNext,
+                    onPrevious = { if (!choosingYear) displayedMonth = displayedMonth.minusMonths(1) },
+                    onNext = { if (!choosingYear) displayedMonth = displayedMonth.plusMonths(1) },
+                    onTitleClick = { choosingYear = !choosingYear },
                 )
-                CalendarWeekdayRow()
-                CalendarMonthGrid(
-                    displayedMonth = displayedMonth,
-                    selectedDate = selectedDate,
-                    minDate = minDate,
-                    maxDate = maxDate,
-                    onDateSelected = { selectedDate = it },
-                )
+                if (choosingYear) {
+                    CalendarYearGrid(
+                        minYear = minDate.year,
+                        maxYear = maxDate.year,
+                        selectedYear = displayedMonth.year,
+                        onYearSelected = { year ->
+                            selectedDate = selectedDate.withYearClamped(year).coerceIn(minDate, maxDate)
+                            displayedMonth = YearMonth.from(selectedDate)
+                            choosingYear = false
+                        },
+                    )
+                } else {
+                    CalendarWeekdayRow()
+                    CalendarMonthGrid(
+                        displayedMonth = displayedMonth,
+                        selectedDate = selectedDate,
+                        minDate = minDate,
+                        maxDate = maxDate,
+                        onDateSelected = { selectedDate = it },
+                    )
+                }
             }
         },
         confirmButton = {
@@ -506,20 +581,30 @@ private fun ApodDatePickerDialog(
 @Composable
 private fun CalendarMonthHeader(
     displayedMonth: YearMonth,
+    choosingYear: Boolean,
     canGoPrevious: Boolean,
     canGoNext: Boolean,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
+    onTitleClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = "${displayedMonth.year}年${displayedMonth.monthValue}月",
-            style = MaterialTheme.typography.titleMedium,
+        TextButton(
+            onClick = onTitleClick,
             modifier = Modifier.weight(1f),
-        )
+        ) {
+            Text(
+                text = if (choosingYear) {
+                    "\u9078\u64c7\u5e74\u4efd"
+                } else {
+                    "${displayedMonth.year}\u5e74${displayedMonth.monthValue}\u6708"
+                },
+                style = MaterialTheme.typography.titleMedium,
+            )
+        }
         TextButton(
             enabled = canGoPrevious,
             onClick = onPrevious,
@@ -536,8 +621,57 @@ private fun CalendarMonthHeader(
 }
 
 @Composable
+private fun CalendarYearGrid(
+    minYear: Int,
+    maxYear: Int,
+    selectedYear: Int,
+    onYearSelected: (Int) -> Unit,
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        modifier = Modifier.height(318.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items((maxYear downTo minYear).toList()) { year ->
+            val selected = year == selectedYear
+            TextButton(
+                onClick = { onYearSelected(year) },
+                modifier = Modifier
+                    .height(48.dp)
+                    .then(
+                        if (selected) {
+                            Modifier
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f))
+                        } else {
+                            Modifier
+                        },
+                    ),
+            ) {
+                Text(
+                    text = "${year}\u5e74",
+                    color = if (selected) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                )
+            }
+        }
+    }
+}
+
+private fun LocalDate.coerceIn(min: LocalDate, max: LocalDate): LocalDate = when {
+    isBefore(min) -> min
+    isAfter(max) -> max
+    else -> this
+}
+
+private fun LocalDate.withYearClamped(year: Int): LocalDate {
+    val targetMonth = YearMonth.of(year, monthValue)
+    return LocalDate.of(year, monthValue, dayOfMonth.coerceAtMost(targetMonth.lengthOfMonth()))
+}
+
+@Composable
 private fun CalendarWeekdayRow() {
-    val weekdays = listOf("日", "一", "二", "三", "四", "五", "六")
+    val weekdays = listOf("\u65e5", "\u4e00", "\u4e8c", "\u4e09", "\u56db", "\u4e94", "\u516d")
     Row(modifier = Modifier.fillMaxWidth()) {
         weekdays.forEach { weekday ->
             Text(
@@ -616,6 +750,84 @@ private fun CalendarDay(
             color = contentColor,
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
+        )
+    }
+}
+
+private sealed interface BirthdayCardDialogState {
+    data object Loading : BirthdayCardDialogState
+    data class Ready(val card: BirthdayStarCard) : BirthdayCardDialogState
+    data object Error : BirthdayCardDialogState
+}
+
+@Composable
+private fun BirthdayCardDialog(
+    state: BirthdayCardDialogState,
+    onDismiss: () -> Unit,
+    onShare: (BirthdayStarCard) -> Unit,
+) {
+    when (state) {
+        BirthdayCardDialogState.Loading -> AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(stringResource(R.string.birthday_card_dialog_title)) },
+            text = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(28.dp))
+                    Text(stringResource(R.string.birthday_card_generating))
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            },
+        )
+
+        is BirthdayCardDialogState.Ready -> AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(stringResource(R.string.birthday_card_dialog_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Image(
+                        bitmap = state.card.previewBitmap.asImageBitmap(),
+                        contentDescription = stringResource(R.string.birthday_card_preview_description),
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(420.dp),
+                    )
+                    Text(
+                        text = state.card.accent.label,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { onShare(state.card) }) {
+                    Text(stringResource(R.string.birthday_card_share))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.birthday_card_close))
+                }
+            },
+        )
+
+        BirthdayCardDialogState.Error -> AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(stringResource(R.string.birthday_card_dialog_title)) },
+            text = { Text(stringResource(R.string.birthday_card_error)) },
+            confirmButton = {
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            },
         )
     }
 }

@@ -22,6 +22,14 @@
 
     <!-- APOD card actions -->
     <string name="apod_video_watch">觀看影片</string>
+    <string name="birthday_card_action">製作生日星空卡</string>
+    <string name="birthday_card_dialog_title">生日星空卡</string>
+    <string name="birthday_card_generating">正在生成卡片…</string>
+    <string name="birthday_card_share">分享</string>
+    <string name="birthday_card_close">關閉</string>
+    <string name="birthday_card_error">無法生成生日星空卡，請稍後再試。</string>
+    <string name="birthday_card_share_title">分享生日星空卡</string>
+    <string name="birthday_card_preview_description">生日星空卡預覽</string>
 
     <!-- Favorite save feedback -->
     <string name="fav_saved">已加入收藏</string>
