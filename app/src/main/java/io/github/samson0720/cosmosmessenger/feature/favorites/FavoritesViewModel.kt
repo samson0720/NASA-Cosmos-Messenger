@@ -9,6 +9,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import io.github.samson0720.cosmosmessenger.R
 import io.github.samson0720.cosmosmessenger.data.local.DatabaseModule
 import io.github.samson0720.cosmosmessenger.data.repository.FavoritesRepositoryImpl
+import io.github.samson0720.cosmosmessenger.domain.model.Apod
 import io.github.samson0720.cosmosmessenger.domain.model.ApodMediaType
 import io.github.samson0720.cosmosmessenger.domain.model.FavoriteApod
 import io.github.samson0720.cosmosmessenger.domain.repository.FavoritesRepository
@@ -30,6 +31,7 @@ data class FavoritesUiState(
 )
 
 data class FavoriteApodUiItem(
+    val apod: Apod,
     val date: LocalDate,
     val displayDate: String,
     val savedAtText: String,
@@ -113,6 +115,7 @@ class FavoritesViewModel(
     private fun FavoriteApod.toUiItem(): FavoriteApodUiItem {
         val apodItem = this.apod
         return FavoriteApodUiItem(
+            apod = apodItem,
             date = apodItem.date,
             displayDate = ApodDateParser.formatForDisplay(apodItem.date),
             savedAtText = ApodDateParser.formatForDisplay(

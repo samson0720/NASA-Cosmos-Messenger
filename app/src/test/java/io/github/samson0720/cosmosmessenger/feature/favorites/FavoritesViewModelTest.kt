@@ -41,6 +41,7 @@ class FavoritesViewModelTest {
         assertEquals(1, state.items.size)
 
         val item = state.items.single()
+        assertEquals(favorite.apod, item.apod)
         assertEquals(favorite.apod.date, item.date)
         assertEquals("2024/01/02", item.displayDate)
         assertEquals(

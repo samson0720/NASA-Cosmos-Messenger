@@ -1,7 +1,6 @@
 package io.github.samson0720.cosmosmessenger.feature.chat
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -63,7 +62,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -91,8 +89,9 @@ import io.github.samson0720.cosmosmessenger.feature.chat.model.ApodCard
 import io.github.samson0720.cosmosmessenger.feature.chat.model.ChatContent
 import io.github.samson0720.cosmosmessenger.feature.chat.model.ChatMessage
 import io.github.samson0720.cosmosmessenger.feature.chat.model.Sender
+import io.github.samson0720.cosmosmessenger.feature.chat.starcard.BirthdayCardDialog
+import io.github.samson0720.cosmosmessenger.feature.chat.starcard.BirthdayCardDialogState
 import io.github.samson0720.cosmosmessenger.feature.chat.starcard.BirthdayCardShareHelper
-import io.github.samson0720.cosmosmessenger.feature.chat.starcard.BirthdayStarCard
 import io.github.samson0720.cosmosmessenger.feature.chat.starcard.BirthdayStarCardRenderer
 import io.github.samson0720.cosmosmessenger.ui.CosmosTopBar
 import io.github.samson0720.cosmosmessenger.ui.theme.CosmosMessengerTheme
@@ -750,84 +749,6 @@ private fun CalendarDay(
             color = contentColor,
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
-        )
-    }
-}
-
-private sealed interface BirthdayCardDialogState {
-    data object Loading : BirthdayCardDialogState
-    data class Ready(val card: BirthdayStarCard) : BirthdayCardDialogState
-    data object Error : BirthdayCardDialogState
-}
-
-@Composable
-private fun BirthdayCardDialog(
-    state: BirthdayCardDialogState,
-    onDismiss: () -> Unit,
-    onShare: (BirthdayStarCard) -> Unit,
-) {
-    when (state) {
-        BirthdayCardDialogState.Loading -> AlertDialog(
-            onDismissRequest = onDismiss,
-            title = { Text(stringResource(R.string.birthday_card_dialog_title)) },
-            text = {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    CircularProgressIndicator(modifier = Modifier.size(28.dp))
-                    Text(stringResource(R.string.birthday_card_generating))
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = onDismiss) {
-                    Text(stringResource(android.R.string.cancel))
-                }
-            },
-        )
-
-        is BirthdayCardDialogState.Ready -> AlertDialog(
-            onDismissRequest = onDismiss,
-            title = { Text(stringResource(R.string.birthday_card_dialog_title)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Image(
-                        bitmap = state.card.previewBitmap.asImageBitmap(),
-                        contentDescription = stringResource(R.string.birthday_card_preview_description),
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(420.dp),
-                    )
-                    Text(
-                        text = state.card.accent.label,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { onShare(state.card) }) {
-                    Text(stringResource(R.string.birthday_card_share))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = onDismiss) {
-                    Text(stringResource(R.string.birthday_card_close))
-                }
-            },
-        )
-
-        BirthdayCardDialogState.Error -> AlertDialog(
-            onDismissRequest = onDismiss,
-            title = { Text(stringResource(R.string.birthday_card_dialog_title)) },
-            text = { Text(stringResource(R.string.birthday_card_error)) },
-            confirmButton = {
-                TextButton(onClick = onDismiss) {
-                    Text(stringResource(android.R.string.ok))
-                }
-            },
         )
     }
 }

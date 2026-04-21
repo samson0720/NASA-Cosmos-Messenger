@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,6 +20,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -27,15 +29,20 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -46,10 +53,16 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import io.github.samson0720.cosmosmessenger.R
+import io.github.samson0720.cosmosmessenger.domain.model.Apod
 import io.github.samson0720.cosmosmessenger.domain.model.ApodMediaType
+import io.github.samson0720.cosmosmessenger.feature.chat.starcard.BirthdayCardDialog
+import io.github.samson0720.cosmosmessenger.feature.chat.starcard.BirthdayCardDialogState
+import io.github.samson0720.cosmosmessenger.feature.chat.starcard.BirthdayCardShareHelper
+import io.github.samson0720.cosmosmessenger.feature.chat.starcard.BirthdayStarCardRenderer
 import io.github.samson0720.cosmosmessenger.ui.CosmosTopBar
 import io.github.samson0720.cosmosmessenger.ui.theme.CosmosMessengerTheme
 import java.time.LocalDate
+import kotlinx.coroutines.launch
 
 @Composable
 fun FavoritesRoute(
@@ -74,6 +87,25 @@ fun FavoritesScreen(
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val snackbarMessage = uiState.snackbarMessage
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val renderer = remember(context.applicationContext) {
+        BirthdayStarCardRenderer(context.applicationContext)
+    }
+    var birthdayCardState by remember {
+        mutableStateOf<BirthdayCardDialogState?>(null)
+    }
+    val onBirthdayCardClick: (FavoriteApodUiItem) -> Unit = onBirthdayCardClick@ { item ->
+        if (item.mediaType != ApodMediaType.IMAGE) return@onBirthdayCardClick
+        birthdayCardState = BirthdayCardDialogState.Loading
+        scope.launch {
+            birthdayCardState = runCatching { renderer.render(item.apod) }
+                .fold(
+                    onSuccess = { BirthdayCardDialogState.Ready(it) },
+                    onFailure = { BirthdayCardDialogState.Error },
+                )
+        }
+    }
 
     LaunchedEffect(snackbarMessage) {
         if (snackbarMessage != null) {
@@ -109,10 +141,19 @@ fun FavoritesScreen(
                     items = uiState.items,
                     deletingDate = uiState.deletingDate,
                     onDeleteClick = onDeleteClick,
+                    onBirthdayCardClick = onBirthdayCardClick,
                 )
             }
         }
         SnackbarHost(hostState = snackbarHostState)
+    }
+
+    birthdayCardState?.let { state ->
+        BirthdayCardDialog(
+            state = state,
+            onDismiss = { birthdayCardState = null },
+            onShare = { card -> BirthdayCardShareHelper.share(context, card) },
+        )
     }
 }
 
@@ -121,6 +162,7 @@ private fun FavoritesGrid(
     items: List<FavoriteApodUiItem>,
     deletingDate: LocalDate?,
     onDeleteClick: (LocalDate) -> Unit,
+    onBirthdayCardClick: (FavoriteApodUiItem) -> Unit,
 ) {
     val uriHandler = LocalUriHandler.current
     LazyVerticalGrid(
@@ -135,6 +177,7 @@ private fun FavoritesGrid(
                 item = item,
                 isDeleting = deletingDate == item.date,
                 onDeleteClick = onDeleteClick,
+                onBirthdayCardClick = { onBirthdayCardClick(item) },
                 onClick = { uriHandler.openUri(item.sourceUrl) },
             )
         }
@@ -146,6 +189,7 @@ private fun FavoriteCard(
     item: FavoriteApodUiItem,
     isDeleting: Boolean,
     onDeleteClick: (LocalDate) -> Unit,
+    onBirthdayCardClick: () -> Unit,
     onClick: () -> Unit,
 ) {
     Surface(
@@ -201,7 +245,42 @@ private fun FavoriteCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (item.mediaType == ApodMediaType.IMAGE) {
+                    Spacer(Modifier.height(6.dp))
+                    BirthdayCardAction(
+                        enabled = !isDeleting,
+                        onClick = onBirthdayCardClick,
+                    )
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun BirthdayCardAction(
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    TextButton(
+        enabled = enabled,
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Share,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+            )
+            Text(
+                text = stringResource(R.string.birthday_card_action),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -265,6 +344,14 @@ private fun FavoritesScreenPreview() {
             uiState = FavoritesUiState(
                 items = listOf(
                     FavoriteApodUiItem(
+                        apod = Apod(
+                            date = LocalDate.of(2024, 1, 1),
+                            title = "Andromeda Galaxy",
+                            explanation = "The Andromeda Galaxy is the closest spiral galaxy to our own Milky Way.",
+                            mediaType = ApodMediaType.IMAGE,
+                            url = "https://apod.nasa.gov/",
+                            hdUrl = null,
+                        ),
                         date = LocalDate.of(2024, 1, 1),
                         displayDate = "2024/01/01",
                         savedAtText = "2026/04/20",
