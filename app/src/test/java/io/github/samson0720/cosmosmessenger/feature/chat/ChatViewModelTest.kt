@@ -89,6 +89,23 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun onDatePicked_formatsDateAndReusesSendFlow() = runTest {
+        val apod = sampleApod(date = LocalDate.of(2024, 1, 2))
+        val repository = FakeApodRepository(Result.success(apod))
+        val viewModel = newViewModel(repository = repository)
+
+        viewModel.onDatePicked(LocalDate.of(2024, 1, 2))
+
+        val state = viewModel.uiState.value
+        assertEquals(listOf(LocalDate.of(2024, 1, 2)), repository.calls)
+        assertEquals(3, state.messages.size)
+        assertEquals("", state.inputText)
+        assertFalse(state.isSending)
+        assertEquals(ChatContent.Text("2024-01-02"), state.messages[1].content)
+        assertTrue(state.messages.last().content is ChatContent.ApodImage)
+    }
+
+    @Test
     fun onSendClick_malformedDate_returnsErrorWithoutRepositoryCall() = runTest {
         val repository = FakeApodRepository()
         val viewModel = newViewModel(repository = repository)

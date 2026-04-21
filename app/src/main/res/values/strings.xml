@@ -9,6 +9,7 @@
     <!-- Chat screen -->
     <string name="chat_input_hint">輸入日期或訊息</string>
     <string name="chat_send">傳送</string>
+    <string name="chat_pick_date">選擇日期</string>
 
     <!-- Nova replies -->
     <string name="nova_welcome">你好，我是 Nova。告訴我日期，我就帶你看那天的 NASA 每日天文圖片。</string>

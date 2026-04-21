@@ -1,11 +1,13 @@
 package io.github.samson0720.cosmosmessenger.feature.chat
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -15,21 +17,26 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
@@ -38,12 +45,16 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -57,6 +68,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -73,7 +85,9 @@ import io.github.samson0720.cosmosmessenger.feature.chat.model.ChatMessage
 import io.github.samson0720.cosmosmessenger.feature.chat.model.Sender
 import io.github.samson0720.cosmosmessenger.ui.CosmosTopBar
 import io.github.samson0720.cosmosmessenger.ui.theme.CosmosMessengerTheme
+import io.github.samson0720.cosmosmessenger.util.ApodDateParser
 import java.time.LocalDate
+import java.time.YearMonth
 
 private val BubbleNovaColor = Color(0xCC1E2547)
 private val BubbleNovaBorder = Color(0x406C5CE7)
@@ -91,6 +105,7 @@ fun ChatRoute(
         uiState = uiState,
         onInputChange = viewModel::onInputChange,
         onSendClick = viewModel::onSendClick,
+        onDatePicked = viewModel::onDatePicked,
         onApodLongPress = viewModel::onApodLongPress,
         onFeedbackShown = viewModel::consumeFeedback,
         modifier = modifier,
@@ -102,6 +117,7 @@ fun ChatScreen(
     uiState: ChatUiState,
     onInputChange: (String) -> Unit,
     onSendClick: () -> Unit,
+    onDatePicked: (LocalDate) -> Unit,
     onApodLongPress: (ChatMessage) -> Unit,
     onFeedbackShown: () -> Unit,
     modifier: Modifier = Modifier,
@@ -109,6 +125,7 @@ fun ChatScreen(
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
     val focusManager = LocalFocusManager.current
+    var showDatePicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.messages.size) {
         if (uiState.messages.isNotEmpty()) {
@@ -179,6 +196,22 @@ fun ChatScreen(
             onSendClick = {
                 onSendClick()
                 focusManager.clearFocus()
+            },
+            onDatePickerClick = {
+                focusManager.clearFocus()
+                showDatePicker = true
+            },
+        )
+    }
+
+    if (showDatePicker) {
+        ApodDatePickerDialog(
+            minDate = ApodDateParser.EARLIEST,
+            maxDate = LocalDate.now(),
+            onDismiss = { showDatePicker = false },
+            onDateConfirmed = { date ->
+                showDatePicker = false
+                onDatePicked(date)
             },
         )
     }
@@ -342,6 +375,7 @@ private fun ChatInputBar(
     sendEnabled: Boolean,
     onInputChange: (String) -> Unit,
     onSendClick: () -> Unit,
+    onDatePickerClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -355,6 +389,13 @@ private fun ChatInputBar(
         // keeping the Material3 outlined look.
         val interactionSource = remember { MutableInteractionSource() }
         val colors = OutlinedTextFieldDefaults.colors()
+        IconButton(onClick = onDatePickerClick) {
+            Icon(
+                imageVector = Icons.Filled.DateRange,
+                contentDescription = stringResource(R.string.chat_pick_date),
+            )
+        }
+        Spacer(Modifier.width(4.dp))
         BasicTextField(
             value = inputText,
             onValueChange = onInputChange,
@@ -412,6 +453,173 @@ private fun ChatInputBar(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ApodDatePickerDialog(
+    minDate: LocalDate,
+    maxDate: LocalDate,
+    onDismiss: () -> Unit,
+    onDateConfirmed: (LocalDate) -> Unit,
+) {
+    var selectedDate by remember(maxDate) { mutableStateOf(maxDate) }
+    var displayedMonth by remember(maxDate) { mutableStateOf(YearMonth.from(maxDate)) }
+    val minMonth = remember(minDate) { YearMonth.from(minDate) }
+    val maxMonth = remember(maxDate) { YearMonth.from(maxDate) }
+    val canGoPrevious = displayedMonth > minMonth
+    val canGoNext = displayedMonth < maxMonth
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.chat_pick_date)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                CalendarMonthHeader(
+                    displayedMonth = displayedMonth,
+                    canGoPrevious = canGoPrevious,
+                    canGoNext = canGoNext,
+                    onPrevious = { displayedMonth = displayedMonth.minusMonths(1) },
+                    onNext = { displayedMonth = displayedMonth.plusMonths(1) },
+                )
+                CalendarWeekdayRow()
+                CalendarMonthGrid(
+                    displayedMonth = displayedMonth,
+                    selectedDate = selectedDate,
+                    minDate = minDate,
+                    maxDate = maxDate,
+                    onDateSelected = { selectedDate = it },
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onDateConfirmed(selectedDate) }) {
+                Text(stringResource(android.R.string.ok))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun CalendarMonthHeader(
+    displayedMonth: YearMonth,
+    canGoPrevious: Boolean,
+    canGoNext: Boolean,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "${displayedMonth.year}年${displayedMonth.monthValue}月",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(
+            enabled = canGoPrevious,
+            onClick = onPrevious,
+        ) {
+            Text("<")
+        }
+        TextButton(
+            enabled = canGoNext,
+            onClick = onNext,
+        ) {
+            Text(">")
+        }
+    }
+}
+
+@Composable
+private fun CalendarWeekdayRow() {
+    val weekdays = listOf("日", "一", "二", "三", "四", "五", "六")
+    Row(modifier = Modifier.fillMaxWidth()) {
+        weekdays.forEach { weekday ->
+            Text(
+                text = weekday,
+                style = MaterialTheme.typography.labelMedium,
+                color = LocalContentColor.current.copy(alpha = 0.7f),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun CalendarMonthGrid(
+    displayedMonth: YearMonth,
+    selectedDate: LocalDate,
+    minDate: LocalDate,
+    maxDate: LocalDate,
+    onDateSelected: (LocalDate) -> Unit,
+) {
+    val firstDayOffset = displayedMonth.atDay(1).dayOfWeek.value % 7
+    val daysInMonth = displayedMonth.lengthOfMonth()
+    val cellCount = ((firstDayOffset + daysInMonth + 6) / 7) * 7
+
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        (0 until cellCount).chunked(7).forEach { week ->
+            Row(modifier = Modifier.fillMaxWidth()) {
+                week.forEach { cell ->
+                    val day = cell - firstDayOffset + 1
+                    Box(
+                        modifier = Modifier.weight(1f),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (day in 1..daysInMonth) {
+                            val date = displayedMonth.atDay(day)
+                            CalendarDay(
+                                day = day,
+                                selected = date == selectedDate,
+                                enabled = date in minDate..maxDate,
+                                onClick = { onDateSelected(date) },
+                            )
+                        } else {
+                            Spacer(Modifier.size(42.dp))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CalendarDay(
+    day: Int,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val background = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent
+    val contentColor = when {
+        selected -> MaterialTheme.colorScheme.onPrimary
+        enabled -> MaterialTheme.colorScheme.onSurface
+        else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+    }
+    Box(
+        modifier = Modifier
+            .size(42.dp)
+            .clip(CircleShape)
+            .background(background)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = day.toString(),
+            color = contentColor,
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
 @Preview(showBackground = true)
 @Composable
 private fun ChatScreenPreview() {
@@ -456,6 +664,7 @@ private fun ChatScreenPreview() {
             ),
             onInputChange = {},
             onSendClick = {},
+            onDatePicked = {},
             onApodLongPress = {},
             onFeedbackShown = {},
         )

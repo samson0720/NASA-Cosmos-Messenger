@@ -29,6 +29,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.UUID
 
 /**
@@ -82,6 +84,15 @@ class ChatViewModel(
 
     fun onInputChange(text: String) {
         _uiState.update { it.copy(inputText = text) }
+    }
+
+    fun onDatePicked(date: LocalDate) {
+        if (_uiState.value.isSending) return
+
+        _uiState.update {
+            it.copy(inputText = date.format(DateTimeFormatter.ISO_LOCAL_DATE))
+        }
+        onSendClick()
     }
 
     fun onSendClick() {
