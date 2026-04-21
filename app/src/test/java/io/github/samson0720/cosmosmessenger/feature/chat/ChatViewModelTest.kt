@@ -5,6 +5,7 @@ import io.github.samson0720.cosmosmessenger.MainDispatcherRule
 import io.github.samson0720.cosmosmessenger.data.ApodRepository
 import io.github.samson0720.cosmosmessenger.domain.model.Apod
 import io.github.samson0720.cosmosmessenger.domain.model.ApodMediaType
+import io.github.samson0720.cosmosmessenger.domain.model.ApodSource
 import io.github.samson0720.cosmosmessenger.domain.model.FavoriteApod
 import io.github.samson0720.cosmosmessenger.domain.repository.FavoritesRepository
 import io.github.samson0720.cosmosmessenger.domain.repository.SaveResult
@@ -69,7 +70,22 @@ class ChatViewModelTest {
         assertTrue(content is ChatContent.ApodImage)
         val apodContent = content as ChatContent.ApodImage
         assertApodCardMatches(apodContent.card, apod)
+        assertFalse(apodContent.card.isFromCache)
         assertSame(apod, apodContent.payload)
+    }
+
+    @Test
+    fun onSendClick_cachedApod_marksReplyCardAsFromCache() = runTest {
+        val apod = sampleApod(source = ApodSource.CACHE)
+        val repository = FakeApodRepository(Result.success(apod))
+        val viewModel = newViewModel(repository = repository)
+
+        viewModel.onInputChange("show me 2024/01/02")
+        viewModel.onSendClick()
+
+        val content = viewModel.uiState.value.messages.last().content
+        assertTrue(content is ChatContent.ApodImage)
+        assertTrue((content as ChatContent.ApodImage).card.isFromCache)
     }
 
     @Test
@@ -179,6 +195,7 @@ class ChatViewModelTest {
         date: LocalDate = LocalDate.of(2024, 1, 2),
         mediaType: ApodMediaType = ApodMediaType.IMAGE,
         hdUrl: String? = "https://example.com/hd.jpg",
+        source: ApodSource = ApodSource.NETWORK,
     ): Apod = Apod(
         date = date,
         title = "Sample title",
@@ -186,6 +203,7 @@ class ChatViewModelTest {
         mediaType = mediaType,
         url = "https://example.com/image.jpg",
         hdUrl = hdUrl,
+        source = source,
     )
 
     private fun sampleApodCard(apod: Apod): ApodCard = ApodCard(
@@ -202,6 +220,7 @@ class ChatViewModelTest {
         assertEquals(apod.explanation, card.explanation)
         assertEquals(apod.url, card.imageUrl)
         assertEquals(apod.hdUrl, card.sourceUrl)
+        assertEquals(apod.source == ApodSource.CACHE, card.isFromCache)
     }
 
     private class FakeApodRepository(

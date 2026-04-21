@@ -3,6 +3,7 @@ package io.github.samson0720.cosmosmessenger.data.mapper
 import io.github.samson0720.cosmosmessenger.data.local.CachedApodEntity
 import io.github.samson0720.cosmosmessenger.domain.model.Apod
 import io.github.samson0720.cosmosmessenger.domain.model.ApodMediaType
+import io.github.samson0720.cosmosmessenger.domain.model.ApodSource
 import java.time.Instant
 import java.time.LocalDate
 
@@ -24,4 +25,5 @@ fun CachedApodEntity.toDomain(): Apod = Apod(
         .getOrDefault(ApodMediaType.OTHER),
     url = url,
     hdUrl = hdUrl,
+    source = ApodSource.CACHE,
 )

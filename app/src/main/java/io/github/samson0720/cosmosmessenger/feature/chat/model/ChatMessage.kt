@@ -34,4 +34,5 @@ data class ApodCard(
     val explanation: String,
     val imageUrl: String?,
     val sourceUrl: String,
+    val isFromCache: Boolean = false,
 )

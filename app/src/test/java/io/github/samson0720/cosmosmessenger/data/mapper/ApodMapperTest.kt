@@ -2,6 +2,7 @@ package io.github.samson0720.cosmosmessenger.data.mapper
 
 import io.github.samson0720.cosmosmessenger.data.remote.ApodDto
 import io.github.samson0720.cosmosmessenger.domain.model.ApodMediaType
+import io.github.samson0720.cosmosmessenger.domain.model.ApodSource
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -21,6 +22,7 @@ class ApodMapperTest {
         assertEquals(ApodMediaType.IMAGE, domain.mediaType)
         assertEquals("https://example.com/image.jpg", domain.url)
         assertEquals("https://example.com/hd.jpg", domain.hdUrl)
+        assertEquals(ApodSource.NETWORK, domain.source)
     }
 
     @Test

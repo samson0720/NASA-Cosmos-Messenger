@@ -16,6 +16,7 @@ import io.github.samson0720.cosmosmessenger.data.remote.NetworkModule
 import io.github.samson0720.cosmosmessenger.data.repository.FavoritesRepositoryImpl
 import io.github.samson0720.cosmosmessenger.domain.model.Apod
 import io.github.samson0720.cosmosmessenger.domain.model.ApodMediaType
+import io.github.samson0720.cosmosmessenger.domain.model.ApodSource
 import io.github.samson0720.cosmosmessenger.domain.repository.FavoritesRepository
 import io.github.samson0720.cosmosmessenger.domain.repository.SaveResult
 import io.github.samson0720.cosmosmessenger.feature.chat.model.ApodCard
@@ -197,6 +198,7 @@ class ChatViewModel(
                         explanation = apod.explanation,
                         imageUrl = apod.url,
                         sourceUrl = apod.hdUrl ?: apod.url,
+                        isFromCache = apod.source == ApodSource.CACHE,
                     ),
                     payload = apod,
                 ),
@@ -211,6 +213,7 @@ class ChatViewModel(
                         explanation = apod.explanation,
                         imageUrl = null,
                         sourceUrl = apod.url,
+                        isFromCache = apod.source == ApodSource.CACHE,
                     ),
                     payload = apod,
                 ),

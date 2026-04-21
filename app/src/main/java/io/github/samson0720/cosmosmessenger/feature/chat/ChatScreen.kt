@@ -418,12 +418,30 @@ private fun ApodHeader(card: ApodCard) {
         text = card.title,
         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
     )
-    Text(
-        text = card.displayDate,
-        style = MaterialTheme.typography.labelSmall,
-        // Secondary metadata: soften against the bubble's contentColor.
-        color = LocalContentColor.current.copy(alpha = 0.65f),
-    )
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = card.displayDate,
+            style = MaterialTheme.typography.labelSmall,
+            // Secondary metadata: soften against the bubble's contentColor.
+            color = LocalContentColor.current.copy(alpha = 0.65f),
+        )
+        if (card.isFromCache) {
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+                contentColor = MaterialTheme.colorScheme.primary,
+            ) {
+                Text(
+                    text = stringResource(R.string.apod_cache_badge),
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                )
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

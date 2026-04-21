@@ -22,6 +22,7 @@
 
     <!-- APOD card actions -->
     <string name="apod_video_watch">觀看影片</string>
+    <string name="apod_cache_badge">Offline cache</string>
     <string name="birthday_card_action">製作生日星空卡</string>
     <string name="birthday_card_dialog_title">生日星空卡</string>
     <string name="birthday_card_generating">正在生成卡片…</string>

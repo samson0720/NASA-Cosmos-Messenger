@@ -5,6 +5,7 @@ import io.github.samson0720.cosmosmessenger.data.remote.ApodService
 import io.github.samson0720.cosmosmessenger.data.local.CachedApodDao
 import io.github.samson0720.cosmosmessenger.data.local.CachedApodEntity
 import io.github.samson0720.cosmosmessenger.domain.model.ApodMediaType
+import io.github.samson0720.cosmosmessenger.domain.model.ApodSource
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
@@ -56,6 +57,7 @@ class ApodRepositoryImplTest {
         assertEquals(ApodMediaType.IMAGE, apod.mediaType)
         assertEquals("https://example.com/image.jpg", apod.url)
         assertEquals("https://example.com/hd.jpg", apod.hdUrl)
+        assertEquals(ApodSource.NETWORK, apod.source)
     }
 
     @Test
@@ -172,6 +174,7 @@ class ApodRepositoryImplTest {
         assertEquals(ApodMediaType.IMAGE, apod.mediaType)
         assertEquals("https://example.com/cached.jpg", apod.url)
         assertEquals("https://example.com/cached-hd.jpg", apod.hdUrl)
+        assertEquals(ApodSource.CACHE, apod.source)
         assertEquals(1, service.calls.size)
         assertEquals(listOf("2024-01-02"), cache.lookups)
     }
