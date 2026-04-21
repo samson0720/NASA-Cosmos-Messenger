@@ -1,5 +1,7 @@
 package io.github.samson0720.cosmosmessenger.feature.chat
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -12,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -21,6 +22,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -41,14 +44,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -64,8 +71,15 @@ import io.github.samson0720.cosmosmessenger.feature.chat.model.ApodCard
 import io.github.samson0720.cosmosmessenger.feature.chat.model.ChatContent
 import io.github.samson0720.cosmosmessenger.feature.chat.model.ChatMessage
 import io.github.samson0720.cosmosmessenger.feature.chat.model.Sender
+import io.github.samson0720.cosmosmessenger.ui.CosmosTopBar
 import io.github.samson0720.cosmosmessenger.ui.theme.CosmosMessengerTheme
 import java.time.LocalDate
+
+private val BubbleNovaColor = Color(0xCC1E2547)
+private val BubbleNovaBorder = Color(0x406C5CE7)
+private val BubbleUserColor = Color(0xCC3A3178)
+private val BubbleUserBorder = Color(0x606C5CE7)
+private val ApodCardBorder = BorderStroke(0.5.dp, Color(0x3074B9FF))
 
 @Composable
 fun ChatRoute(
@@ -94,6 +108,7 @@ fun ChatScreen(
 ) {
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val focusManager = LocalFocusManager.current
 
     LaunchedEffect(uiState.messages.size) {
         if (uiState.messages.isNotEmpty()) {
@@ -125,16 +140,24 @@ fun ChatScreen(
         }
     }
 
+    // The activity window is resized by the IME, so the root column should
+    // fill the resized viewport without adding imePadding() again. Applying
+    // both would subtract the keyboard height twice and leave a large gap
+    // between the input bar and the keyboard.
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .imePadding(),
+        modifier = modifier.fillMaxSize(),
     ) {
+        CosmosTopBar(title = stringResource(R.string.tab_nova))
         LazyColumn(
             state = listState,
             modifier = Modifier
                 .weight(1f)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                // Tap on the message area dismisses the keyboard; detectTapGestures
+                // ignores drag sequences so the list's own scroll gesture is intact.
+                .pointerInput(Unit) {
+                    detectTapGestures(onTap = { focusManager.clearFocus() })
+                },
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -150,7 +173,13 @@ fun ChatScreen(
             inputText = uiState.inputText,
             sendEnabled = uiState.inputText.isNotBlank() && !uiState.isSending,
             onInputChange = onInputChange,
-            onSendClick = onSendClick,
+            // clearFocus() both hides the soft keyboard and releases focus —
+            // a plain SoftwareKeyboardController.hide() would leave the field
+            // focused and re-open the IME on the next touch.
+            onSendClick = {
+                onSendClick()
+                focusManager.clearFocus()
+            },
         )
     }
 }
@@ -161,8 +190,9 @@ private fun MessageRow(
     onApodLongPress: (ChatMessage) -> Unit,
 ) {
     val isUser = message.sender == Sender.User
-    // Nova cards need a bit more room for the image; user bubbles stay compact.
-    val maxWidth = if (isUser) 280.dp else 300.dp
+    // User text bubbles stay compact; Nova bubbles hold APOD cards in a narrower frame
+    // so the chat still feels like a conversation rather than a full-width gallery.
+    val maxWidth = if (isUser) 300.dp else 272.dp
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
@@ -188,12 +218,14 @@ private fun Bubble(
     } else {
         RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 4.dp, bottomEnd = 16.dp)
     }
-    val container =
-        if (isUser) MaterialTheme.colorScheme.primaryContainer
-        else MaterialTheme.colorScheme.surfaceVariant
-    val content =
-        if (isUser) MaterialTheme.colorScheme.onPrimaryContainer
-        else MaterialTheme.colorScheme.onSurfaceVariant
+    // Frosted-glass over the starfield: fixed dark tints with ~80% alpha read legibly
+    // regardless of system theme, since the backdrop is always the cosmos background.
+    val container = if (isUser) BubbleUserColor else BubbleNovaColor
+    val border = BorderStroke(
+        width = 0.5.dp,
+        color = if (isUser) BubbleUserBorder else BubbleNovaBorder,
+    )
+    val content = Color.White
 
     val isApod = message.content is ChatContent.ApodImage ||
         message.content is ChatContent.ApodVideo
@@ -219,7 +251,7 @@ private fun Bubble(
         shape = shape,
         color = container,
         contentColor = content,
-        tonalElevation = 1.dp,
+        border = border,
     ) {
         when (val c = message.content) {
             is ChatContent.Text -> Text(
@@ -237,7 +269,7 @@ private fun Bubble(
 private fun ApodImageCard(card: ApodCard) {
     // Full-bleed hero image: the surrounding Bubble Surface shape already
     // clips the rounded corners, so no extra clip/shape is needed here.
-    Column {
+    Column(modifier = Modifier.border(ApodCardBorder, RoundedCornerShape(16.dp))) {
         if (card.imageUrl != null) {
             AsyncImage(
                 model = card.imageUrl,
@@ -264,7 +296,11 @@ private fun ApodImageCard(card: ApodCard) {
 @Composable
 private fun ApodVideoCard(card: ApodCard) {
     val uriHandler = LocalUriHandler.current
-    Column(modifier = Modifier.padding(12.dp)) {
+    Column(
+        modifier = Modifier
+            .border(ApodCardBorder, RoundedCornerShape(16.dp))
+            .padding(12.dp),
+    ) {
         ApodHeader(card = card)
         Spacer(Modifier.height(6.dp))
         Text(
@@ -332,6 +368,15 @@ private fun ChatInputBar(
             ),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             interactionSource = interactionSource,
+            // Enter key in the IME acts as Send — matches the UX of LINE /
+            // Messenger / WhatsApp for a single-line chat input.
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Sentences,
+                imeAction = ImeAction.Send,
+            ),
+            keyboardActions = KeyboardActions(
+                onSend = { if (sendEnabled) onSendClick() },
+            ),
             decorationBox = { innerTextField ->
                 OutlinedTextFieldDefaults.DecorationBox(
                     value = inputText,
@@ -343,11 +388,12 @@ private fun ChatInputBar(
                     placeholder = { Text(stringResource(R.string.chat_input_hint)) },
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                     container = {
-                        OutlinedTextFieldDefaults.ContainerBox(
+                        OutlinedTextFieldDefaults.Container(
                             enabled = true,
                             isError = false,
                             interactionSource = interactionSource,
                             colors = colors,
+                            shape = RoundedCornerShape(24.dp),
                         )
                     },
                 )

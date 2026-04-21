@@ -1,6 +1,9 @@
 package io.github.samson0720.cosmosmessenger.navigation
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -18,6 +21,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import io.github.samson0720.cosmosmessenger.feature.chat.ChatRoute
 import io.github.samson0720.cosmosmessenger.feature.favorites.FavoritesRoute
+import io.github.samson0720.cosmosmessenger.ui.StarfieldBackground
+import io.github.samson0720.cosmosmessenger.ui.theme.CosmosNight
 
 @Composable
 fun AppNavHost() {
@@ -50,15 +55,22 @@ fun AppNavHost() {
             }
         },
     ) { padding ->
-        NavHost(
-            navController = navController,
-            startDestination = TopLevelDestination.Nova.route,
+        Box(
             modifier = Modifier
+                .fillMaxSize()
                 .padding(padding)
-                .consumeWindowInsets(padding),
+                .consumeWindowInsets(padding)
+                .background(CosmosNight),
         ) {
-            composable(TopLevelDestination.Nova.route) { ChatRoute() }
-            composable(TopLevelDestination.Favorites.route) { FavoritesRoute() }
+            StarfieldBackground(modifier = Modifier.fillMaxSize())
+            NavHost(
+                navController = navController,
+                startDestination = TopLevelDestination.Nova.route,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                composable(TopLevelDestination.Nova.route) { ChatRoute() }
+                composable(TopLevelDestination.Favorites.route) { FavoritesRoute() }
+            }
         }
     }
 }

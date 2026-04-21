@@ -24,15 +24,10 @@ Thumbs.db
 *.jks
 *.keystore
 
-# --- Local AI / helper tool configs ---
-.claude/
-.codex/
-
 # --- Optional: internal planning docs, keep submission repo clean ---
-AGENTS.md
-CLAUDE.md
 docs/PROJECT_SPEC.md
 docs/TASKS.md
 
 # --- Optional: original assignment PDF ---
+/2026-Android-TF-Pre-assessment.pdf
 docs/reference/2026-Android-TF-Pre-assessment.pdf

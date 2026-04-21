@@ -1,33 +1,40 @@
 package io.github.samson0720.cosmosmessenger.feature.favorites
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
@@ -40,6 +47,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import io.github.samson0720.cosmosmessenger.R
 import io.github.samson0720.cosmosmessenger.domain.model.ApodMediaType
+import io.github.samson0720.cosmosmessenger.ui.CosmosTopBar
 import io.github.samson0720.cosmosmessenger.ui.theme.CosmosMessengerTheme
 import java.time.LocalDate
 
@@ -82,6 +90,7 @@ fun FavoritesScreen(
     }
 
     Column(modifier = modifier.fillMaxSize()) {
+        CosmosTopBar(title = stringResource(R.string.tab_favorites))
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -96,7 +105,7 @@ fun FavoritesScreen(
                     modifier = Modifier.align(Alignment.Center),
                 )
 
-                else -> FavoritesList(
+                else -> FavoritesGrid(
                     items = uiState.items,
                     deletingDate = uiState.deletingDate,
                     onDeleteClick = onDeleteClick,
@@ -108,32 +117,25 @@ fun FavoritesScreen(
 }
 
 @Composable
-private fun FavoritesList(
+private fun FavoritesGrid(
     items: List<FavoriteApodUiItem>,
     deletingDate: LocalDate?,
     onDeleteClick: (LocalDate) -> Unit,
 ) {
-    LazyColumn(
+    val uriHandler = LocalUriHandler.current
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
-            Text(
-                text = stringResource(R.string.favorites_title),
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
-            )
-            Text(
-                text = stringResource(R.string.favorites_subtitle),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
         items(items = items, key = { it.date.toString() }) { item ->
             FavoriteCard(
                 item = item,
                 isDeleting = deletingDate == item.date,
                 onDeleteClick = onDeleteClick,
+                onClick = { uriHandler.openUri(item.sourceUrl) },
             )
         }
     }
@@ -144,85 +146,89 @@ private fun FavoriteCard(
     item: FavoriteApodUiItem,
     isDeleting: Boolean,
     onDeleteClick: (LocalDate) -> Unit,
+    onClick: () -> Unit,
 ) {
-    val uriHandler = LocalUriHandler.current
     Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        tonalElevation = 1.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = !isDeleting, onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        color = FavoriteCardColor,
+        contentColor = Color.White,
+        border = BorderStroke(0.5.dp, FavoriteCardBorder),
     ) {
         Column {
-            if (item.imageUrl != null) {
-                AsyncImage(
-                    model = item.imageUrl,
-                    contentDescription = item.title,
-                    contentScale = ContentScale.Crop,
+            Box {
+                if (item.imageUrl != null) {
+                    AsyncImage(
+                        model = item.imageUrl,
+                        contentDescription = item.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(140.dp),
+                    )
+                }
+                DeleteBadge(
+                    enabled = !isDeleting,
+                    onClick = { onDeleteClick(item.date) },
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(190.dp),
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp),
                 )
             }
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = item.title,
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.SemiBold,
-                            ),
-                        )
-                        Text(
-                            text = item.displayDate,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = LocalContentColor.current.copy(alpha = 0.7f),
-                        )
-                    }
-                    TextButton(
-                        onClick = { onDeleteClick(item.date) },
-                        enabled = !isDeleting,
-                    ) {
-                        Text(stringResource(R.string.fav_delete))
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
+            Column(modifier = Modifier.padding(12.dp)) {
                 Text(
-                    text = item.explanation,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 4,
+                    text = item.title,
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontWeight = FontWeight.SemiBold,
+                    ),
+                    color = Color.White,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.height(10.dp))
-                HorizontalDivider(color = LocalContentColor.current.copy(alpha = 0.12f))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = stringResource(R.string.fav_saved_on, item.savedAtText),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = LocalContentColor.current.copy(alpha = 0.65f),
-                    )
-                    TextButton(onClick = { uriHandler.openUri(item.sourceUrl) }) {
-                        Text(
-                            text = stringResource(
-                                if (item.mediaType == ApodMediaType.IMAGE) {
-                                    R.string.fav_open_image
-                                } else {
-                                    R.string.fav_open_video
-                                },
-                            ),
-                        )
-                    }
-                }
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = item.displayDate,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = FavoriteCardDateColor,
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = item.explanation,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.6f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun DeleteBadge(
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    // A plain clickable Box (not FilledIconButton) so the badge can sit at a compact
+    // 32dp — the Material IconButton tokens enforce a 40dp hit target that's too big
+    // for a thumbnail overlay.
+    Box(
+        modifier = modifier
+            .size(32.dp)
+            .clip(CircleShape)
+            .background(DeleteBadgeBackground)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Star,
+            contentDescription = stringResource(R.string.fav_delete),
+            tint = Color.White,
+            modifier = Modifier.size(18.dp),
+        )
     }
 }
 
@@ -236,14 +242,20 @@ private fun EmptyFavorites(modifier: Modifier = Modifier) {
         Text(
             text = stringResource(R.string.favorites_empty_title),
             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+            color = Color.White,
         )
         Text(
             text = stringResource(R.string.favorites_empty_body),
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = Color.White.copy(alpha = 0.7f),
         )
     }
 }
+
+private val FavoriteCardColor = Color(0xCC1E2547)
+private val FavoriteCardBorder = Color(0x3074B9FF)
+private val FavoriteCardDateColor = Color(0xFF74B9FF).copy(alpha = 0.8f)
+private val DeleteBadgeBackground = Color(0x66000000)
 
 @Preview(showBackground = true)
 @Composable
