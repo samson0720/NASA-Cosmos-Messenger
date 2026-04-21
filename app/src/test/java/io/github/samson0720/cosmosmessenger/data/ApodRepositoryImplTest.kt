@@ -2,6 +2,8 @@ package io.github.samson0720.cosmosmessenger.data
 
 import io.github.samson0720.cosmosmessenger.data.remote.ApodDto
 import io.github.samson0720.cosmosmessenger.data.remote.ApodService
+import io.github.samson0720.cosmosmessenger.data.local.CachedApodDao
+import io.github.samson0720.cosmosmessenger.data.local.CachedApodEntity
 import io.github.samson0720.cosmosmessenger.domain.model.ApodMediaType
 import java.io.IOException
 import java.net.SocketTimeoutException
@@ -54,6 +56,28 @@ class ApodRepositoryImplTest {
         assertEquals(ApodMediaType.IMAGE, apod.mediaType)
         assertEquals("https://example.com/image.jpg", apod.url)
         assertEquals("https://example.com/hd.jpg", apod.hdUrl)
+    }
+
+    @Test
+    fun getApod_success_cachesApodByDate() = runTest {
+        val service = FakeApodService()
+        val cache = FakeCachedApodDao()
+        val repository = ApodRepositoryImpl(
+            service = service,
+            apiKey = "test-key",
+            cacheDao = cache,
+        )
+
+        val result = repository.getApod(LocalDate.of(2024, 1, 2))
+
+        assertTrue(result.isSuccess)
+        val cached = cache.upserts.single()
+        assertEquals("2024-01-02", cached.date)
+        assertEquals("Sample title", cached.title)
+        assertEquals("Sample explanation", cached.explanation)
+        assertEquals("IMAGE", cached.mediaType)
+        assertEquals("https://example.com/image.jpg", cached.url)
+        assertEquals("https://example.com/hd.jpg", cached.hdUrl)
     }
 
     @Test
@@ -121,6 +145,38 @@ class ApodRepositoryImplTest {
     }
 
     @Test
+    fun getApod_unknownHostWithCachedDate_returnsCachedApod() = runTest {
+        val service = FakeApodService {
+            throw UnknownHostException("offline")
+        }
+        val cache = FakeCachedApodDao(
+            initialRows = listOf(
+                sampleCachedEntity(
+                    date = "2024-01-02",
+                    title = "Cached title",
+                    explanation = "Cached explanation",
+                ),
+            ),
+        )
+        val repository = ApodRepositoryImpl(
+            service = service,
+            apiKey = "test-key",
+            cacheDao = cache,
+        )
+
+        val apod = repository.getApod(LocalDate.of(2024, 1, 2)).getOrThrow()
+
+        assertEquals(LocalDate.of(2024, 1, 2), apod.date)
+        assertEquals("Cached title", apod.title)
+        assertEquals("Cached explanation", apod.explanation)
+        assertEquals(ApodMediaType.IMAGE, apod.mediaType)
+        assertEquals("https://example.com/cached.jpg", apod.url)
+        assertEquals("https://example.com/cached-hd.jpg", apod.hdUrl)
+        assertEquals(1, service.calls.size)
+        assertEquals(listOf("2024-01-02"), cache.lookups)
+    }
+
+    @Test
     fun getApod_transientHttp503_retriesOnce() = runTest {
         var attempt = 0
         val service = FakeApodService {
@@ -164,6 +220,25 @@ class ApodRepositoryImplTest {
         }
     }
 
+    private class FakeCachedApodDao(
+        initialRows: List<CachedApodEntity> = emptyList(),
+    ) : CachedApodDao {
+
+        private val rows = initialRows.associateBy { it.date }.toMutableMap()
+        val upserts = mutableListOf<CachedApodEntity>()
+        val lookups = mutableListOf<String>()
+
+        override suspend fun upsert(entity: CachedApodEntity) {
+            upserts += entity
+            rows[entity.date] = entity
+        }
+
+        override suspend fun getByDate(date: String): CachedApodEntity? {
+            lookups += date
+            return rows[date]
+        }
+    }
+
     private companion object {
         fun sampleDto(): ApodDto = ApodDto(
             date = "2024-01-02",
@@ -179,5 +254,19 @@ class ApodRepositoryImplTest {
             val body = "{}".toResponseBody("application/json".toMediaType())
             return HttpException(Response.error<ApodDto>(code, body))
         }
+
+        fun sampleCachedEntity(
+            date: String = "2024-01-02",
+            title: String = "Cached title",
+            explanation: String = "Cached explanation",
+        ): CachedApodEntity = CachedApodEntity(
+            date = date,
+            title = title,
+            explanation = explanation,
+            mediaType = "IMAGE",
+            url = "https://example.com/cached.jpg",
+            hdUrl = "https://example.com/cached-hd.jpg",
+            cachedAt = 1_700_000_000_000L,
+        )
     }
 }

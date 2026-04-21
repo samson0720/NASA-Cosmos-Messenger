@@ -2,6 +2,8 @@ package io.github.samson0720.cosmosmessenger.data
 
 import android.util.Log
 import io.github.samson0720.cosmosmessenger.BuildConfig
+import io.github.samson0720.cosmosmessenger.data.local.CachedApodDao
+import io.github.samson0720.cosmosmessenger.data.mapper.toCachedEntity
 import io.github.samson0720.cosmosmessenger.data.mapper.toDomain
 import io.github.samson0720.cosmosmessenger.data.remote.ApodDto
 import io.github.samson0720.cosmosmessenger.data.remote.ApodService
@@ -10,6 +12,7 @@ import retrofit2.HttpException
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
+import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlin.coroutines.cancellation.CancellationException
@@ -19,13 +22,16 @@ private const val TAG = "ApodRepo"
 class ApodRepositoryImpl(
     private val service: ApodService,
     private val apiKey: String,
+    private val cacheDao: CachedApodDao? = null,
 ) : ApodRepository {
 
     override suspend fun getApod(date: LocalDate?): Result<Apod> = try {
         val dateParam = date?.format(DateTimeFormatter.ISO_LOCAL_DATE)
         if (BuildConfig.DEBUG) Log.d(TAG, "request date=${dateParam ?: "today"}")
         val dto = fetchWithOneRetry(dateParam)
-        Result.success(dto.toDomain())
+        val apod = dto.toDomain()
+        cache(apod)
+        Result.success(apod)
     } catch (e: HttpException) {
         if (BuildConfig.DEBUG) Log.w(TAG, "HTTP ${e.code()}")
         Result.failure(
@@ -37,6 +43,7 @@ class ApodRepositoryImpl(
         )
     } catch (e: IOException) {
         if (BuildConfig.DEBUG) Log.w(TAG, "IO ${e.javaClass.simpleName}")
+        cached(date)?.let { return Result.success(it) }
         Result.failure(ApodException.Network)
     } catch (e: CancellationException) {
         // Keep structured concurrency intact — never convert cancellation
@@ -77,6 +84,26 @@ class ApodRepositoryImpl(
         is HttpException -> e.code() in TRANSIENT_HTTP_CODES
         is IOException -> true
         else -> false
+    }
+
+    private suspend fun cache(apod: Apod) {
+        val dao = cacheDao ?: return
+        runCatching {
+            dao.upsert(apod.toCachedEntity(cachedAt = Instant.now()))
+        }.onFailure { e ->
+            if (BuildConfig.DEBUG) Log.w(TAG, "cache write failed", e)
+        }
+    }
+
+    private suspend fun cached(date: LocalDate?): Apod? {
+        val dao = cacheDao ?: return null
+        val lookupDate = date ?: LocalDate.now()
+        return runCatching {
+            dao.getByDate(lookupDate.format(DateTimeFormatter.ISO_LOCAL_DATE))
+                ?.toDomain()
+        }.onFailure { e ->
+            if (BuildConfig.DEBUG) Log.w(TAG, "cache read failed", e)
+        }.getOrNull()
     }
 
     companion object {

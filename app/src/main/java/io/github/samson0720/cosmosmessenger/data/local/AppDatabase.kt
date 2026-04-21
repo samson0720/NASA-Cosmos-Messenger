@@ -8,10 +8,11 @@ import androidx.room.RoomDatabase
 // intent, cache is transient repository state. Bonus 1 should add its own
 // entity + DAO here, never widen `favorite_apod`.
 @Database(
-    entities = [FavoriteApodEntity::class],
-    version = 1,
+    entities = [FavoriteApodEntity::class, CachedApodEntity::class],
+    version = 2,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun favoriteApodDao(): FavoriteApodDao
+    abstract fun cachedApodDao(): CachedApodDao
 }

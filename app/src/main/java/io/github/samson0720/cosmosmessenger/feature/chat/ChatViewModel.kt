@@ -231,12 +231,14 @@ class ChatViewModel(
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
                     as Application
+                val database = DatabaseModule.get(app)
                 val apodRepository = ApodRepositoryImpl(
                     service = NetworkModule.apodService,
                     apiKey = BuildConfig.NASA_API_KEY,
+                    cacheDao = database.cachedApodDao(),
                 )
                 val favoritesRepository = FavoritesRepositoryImpl(
-                    dao = DatabaseModule.get(app).favoriteApodDao(),
+                    dao = database.favoriteApodDao(),
                 )
                 ChatViewModel(app, apodRepository, favoritesRepository)
             }
