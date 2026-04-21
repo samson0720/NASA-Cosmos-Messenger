@@ -43,6 +43,16 @@ sealed interface FavoriteFeedback {
     data object SaveFailed : FavoriteFeedback
 }
 
+fun interface ChatStringProvider {
+    fun getString(resId: Int): String
+}
+
+private class AndroidChatStringProvider(
+    private val application: Application,
+) : ChatStringProvider {
+    override fun getString(resId: Int): String = application.getString(resId)
+}
+
 data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
     val inputText: String = "",
@@ -54,6 +64,7 @@ class ChatViewModel(
     application: Application,
     private val repository: ApodRepository,
     private val favoritesRepository: FavoritesRepository,
+    private val stringProvider: ChatStringProvider = AndroidChatStringProvider(application),
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(
@@ -62,7 +73,7 @@ class ChatViewModel(
                 ChatMessage(
                     id = newId(),
                     sender = Sender.Nova,
-                    content = ChatContent.Text(application.getString(R.string.nova_welcome)),
+                    content = ChatContent.Text(stringProvider.getString(R.string.nova_welcome)),
                 ),
             ),
         ),
@@ -199,7 +210,7 @@ class ChatViewModel(
     private fun novaText(resId: Int): ChatMessage = ChatMessage(
         id = newId(),
         sender = Sender.Nova,
-        content = ChatContent.Text(getApplication<Application>().getString(resId)),
+        content = ChatContent.Text(stringProvider.getString(resId)),
     )
 
     private fun newId(): String = UUID.randomUUID().toString()

@@ -40,9 +40,20 @@ data class FavoriteApodUiItem(
     val sourceUrl: String,
 )
 
+fun interface FavoritesStringProvider {
+    fun getString(resId: Int): String
+}
+
+private class AndroidFavoritesStringProvider(
+    private val application: Application,
+) : FavoritesStringProvider {
+    override fun getString(resId: Int): String = application.getString(resId)
+}
+
 class FavoritesViewModel(
     application: Application,
     private val repository: FavoritesRepository,
+    private val stringProvider: FavoritesStringProvider = AndroidFavoritesStringProvider(application),
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(FavoritesUiState())
@@ -116,7 +127,7 @@ class FavoritesViewModel(
     }
 
     private fun appString(resId: Int): String =
-        getApplication<Application>().getString(resId)
+        stringProvider.getString(resId)
 
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
