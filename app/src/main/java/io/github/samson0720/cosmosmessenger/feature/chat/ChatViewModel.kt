@@ -115,10 +115,10 @@ class ChatViewModel(
         }
 
         viewModelScope.launch {
-            val reply = buildReplyFor(text)
+            val replies = buildRepliesFor(text)
             _uiState.update {
                 it.copy(
-                    messages = it.messages + reply,
+                    messages = it.messages + replies,
                     isSending = false,
                 )
             }
@@ -158,27 +158,35 @@ class ChatViewModel(
         _uiState.update { it.copy(feedback = null) }
     }
 
-    private suspend fun buildReplyFor(input: String): ChatMessage {
+    private suspend fun buildRepliesFor(input: String): List<ChatMessage> {
         val dateResult = ApodDateParser.extract(input)
         val target = when (dateResult) {
             is DateResult.Valid -> dateResult.date
             is DateResult.None -> null
-            is DateResult.Malformed -> return novaText(R.string.nova_error_invalid_date)
-            is DateResult.OutOfRange -> return novaText(
+            is DateResult.Malformed -> return listOf(novaText(R.string.nova_error_invalid_date))
+            is DateResult.OutOfRange -> return listOf(novaText(
                 if (dateResult.tooOld) R.string.nova_error_too_old
                 else R.string.nova_error_future_date
-            )
+            ))
         }
 
         return repository.getApod(target).fold(
-            onSuccess = { apod -> renderApod(apod) },
+            onSuccess = { apod ->
+                listOf(
+                    novaText(
+                        if (target == null) R.string.nova_today_intro
+                        else R.string.nova_date_intro,
+                    ),
+                    renderApod(apod),
+                )
+            },
             onFailure = { error ->
                 val resId = when (error) {
                     is ApodException.RateLimited -> R.string.nova_error_rate_limited
                     is ApodException.NotFound -> R.string.nova_error_not_found
                     else -> R.string.nova_error_network
                 }
-                novaText(resId)
+                listOf(novaText(resId))
             },
         )
     }

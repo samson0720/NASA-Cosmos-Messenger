@@ -12,7 +12,9 @@
     <string name="chat_pick_date">選擇日期</string>
 
     <!-- Nova replies -->
-    <string name="nova_welcome">你好，我是 Nova。告訴我日期，我就帶你看那天的 NASA 每日天文圖片。</string>
+    <string name="nova_welcome">歡迎! 輸入日期我會告訴你那天的宇宙長什麼樣子。</string>
+    <string name="nova_today_intro">這是今天的APOD:</string>
+    <string name="nova_date_intro">那天的宇宙長這樣:</string>
     <string name="nova_error_too_old">NASA 每日天文圖片自 1995/06/16 開始，請改試更晚的日期。</string>
     <string name="nova_error_future_date">日期在未來喔，請改試今天或更早的日期。</string>
     <string name="nova_error_invalid_date">這看起來不是有效的日期，請使用 yyyy/MM/dd 或 yyyy-MM-dd。</string>
@@ -23,9 +25,12 @@
     <!-- APOD card actions -->
     <string name="apod_video_watch">觀看影片</string>
     <string name="apod_cache_badge">Offline cache</string>
+    <string name="apod_image_preview_action">預覽</string>
     <string name="apod_image_preview_open">開啟原圖</string>
     <string name="apod_image_preview_close">關閉預覽</string>
+    <string name="apod_original_action">原圖</string>
     <string name="birthday_card_action">製作生日星空卡</string>
+    <string name="birthday_card_action_short">星空卡</string>
     <string name="birthday_card_dialog_title">生日星空卡</string>
     <string name="birthday_card_generating">正在生成卡片…</string>
     <string name="birthday_card_share">分享</string>

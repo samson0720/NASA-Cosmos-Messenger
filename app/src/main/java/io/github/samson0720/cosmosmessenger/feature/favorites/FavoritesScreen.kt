@@ -210,7 +210,7 @@ private fun FavoriteCard(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(140.dp),
+                            .height(122.dp),
                     )
                 }
                 DeleteBadge(
@@ -221,14 +221,14 @@ private fun FavoriteCard(
                         .padding(8.dp),
                 )
             }
-            Column(modifier = Modifier.padding(12.dp)) {
+            Column(modifier = Modifier.padding(10.dp)) {
                 Text(
                     text = item.title,
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontWeight = FontWeight.SemiBold,
                     ),
                     color = Color.White,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.height(2.dp))
@@ -242,11 +242,11 @@ private fun FavoriteCard(
                     text = item.explanation,
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.6f),
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (item.mediaType == ApodMediaType.IMAGE) {
-                    Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.height(4.dp))
                     BirthdayCardAction(
                         enabled = !isDeleting,
                         onClick = onBirthdayCardClick,
@@ -266,9 +266,11 @@ private fun BirthdayCardAction(
         enabled = enabled,
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
     ) {
         Row(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
@@ -276,8 +278,9 @@ private fun BirthdayCardAction(
                 contentDescription = null,
                 modifier = Modifier.size(16.dp),
             )
+            Spacer(Modifier.size(6.dp))
             Text(
-                text = stringResource(R.string.birthday_card_action),
+                text = stringResource(R.string.birthday_card_action_short),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

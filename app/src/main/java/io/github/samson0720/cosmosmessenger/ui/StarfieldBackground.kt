@@ -40,6 +40,7 @@ import kotlin.random.Random
 @Composable
 fun StarfieldBackground(modifier: Modifier = Modifier) {
     val stars = remember { generateStars(count = 100) }
+    val milkyWayDust = remember { generateMilkyWayDust(count = 140) }
     val nebulae = remember { generateNebulae() }
 
     // Single monotonically-increasing clock drives all 100 stars. Reading it inside the
@@ -86,12 +87,24 @@ fun StarfieldBackground(modifier: Modifier = Modifier) {
     }
 
     Canvas(modifier = modifier.fillMaxSize()) {
+        drawRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xDD07131F),
+                    Color(0xAA0B1026),
+                    Color(0xEE050716),
+                ),
+            ),
+            topLeft = Offset.Zero,
+            size = size,
+        )
+
         // 1) Galaxy band — a full-canvas drawRect filled with a linearGradient whose
         // axis runs perpendicular to the band. Clamp mode keeps it transparent outside
         // the band, and the gradient's soft stops mean there are no visible edges.
         // Two overlapping bands: a wider haze (120dp) and a narrow brighter core (40dp).
-        val axisStart = Offset(0f, size.height * 0.8f)
-        val axisEnd = Offset(size.width, size.height * 0.2f)
+        val axisStart = Offset(-size.width * 0.14f, size.height * 0.74f)
+        val axisEnd = Offset(size.width * 1.14f, size.height * 0.16f)
         val bandCenter = Offset(
             x = (axisStart.x + axisEnd.x) * 0.5f,
             y = (axisStart.y + axisEnd.y) * 0.5f,
@@ -106,7 +119,9 @@ fun StarfieldBackground(modifier: Modifier = Modifier) {
         fun bandGradient(halfWidthPx: Float, coreColor: Color): Brush = Brush.linearGradient(
             colorStops = arrayOf(
                 0f to Color.Transparent,
+                0.22f to Color.Transparent,
                 0.5f to coreColor,
+                0.78f to Color.Transparent,
                 1f to Color.Transparent,
             ),
             start = Offset(
@@ -120,15 +135,53 @@ fun StarfieldBackground(modifier: Modifier = Modifier) {
         )
 
         drawRect(
-            brush = bandGradient(halfWidthPx = 60.dp.toPx(), coreColor = Color(0x08FFFFFF)),
+            brush = bandGradient(halfWidthPx = 185.dp.toPx(), coreColor = Color(0x123F6E8E)),
             topLeft = Offset.Zero,
             size = size,
         )
         drawRect(
-            brush = bandGradient(halfWidthPx = 20.dp.toPx(), coreColor = Color(0x0EFFFFFF)),
+            brush = bandGradient(halfWidthPx = 86.dp.toPx(), coreColor = Color(0x1AFFFFFF)),
             topLeft = Offset.Zero,
             size = size,
         )
+        drawRect(
+            brush = bandGradient(halfWidthPx = 32.dp.toPx(), coreColor = Color(0x20DDEBFF)),
+            topLeft = Offset.Zero,
+            size = size,
+        )
+
+        listOf(
+            GalaxyGlow(t = 0.23f, offsetDp = (-8).dp, radiusDp = 140.dp, color = Color(0xFFE8F0FF), alpha = 0.16f),
+            GalaxyGlow(t = 0.32f, offsetDp = 18.dp, radiusDp = 108.dp, color = Color(0xFFFFD8B5), alpha = 0.10f),
+            GalaxyGlow(t = 0.58f, offsetDp = (-22).dp, radiusDp = 150.dp, color = Color(0xFF9CCEFF), alpha = 0.08f),
+        ).forEach { glow ->
+            val center = Offset(
+                x = axisStart.x + axisDx * glow.t + perpX * glow.offsetDp.toPx(),
+                y = axisStart.y + axisDy * glow.t + perpY * glow.offsetDp.toPx(),
+            )
+            val radiusPx = glow.radiusDp.toPx()
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(glow.color.copy(alpha = glow.alpha), Color.Transparent),
+                    center = center,
+                    radius = radiusPx,
+                ),
+                radius = radiusPx,
+                center = center,
+            )
+        }
+
+        milkyWayDust.forEach { dust ->
+            val center = Offset(
+                x = axisStart.x + axisDx * dust.t + perpX * dust.offsetDp.toPx(),
+                y = axisStart.y + axisDy * dust.t + perpY * dust.offsetDp.toPx(),
+            )
+            drawCircle(
+                color = dust.color.copy(alpha = dust.alpha),
+                radius = dust.sizeDp.toPx(),
+                center = center,
+            )
+        }
 
         // 2) Four corner nebulae — soft radial falloff stands in for a Gaussian blur and
         // is rendering-correct on every backend (BlurMaskFilter is unreliable on HW canvas).
@@ -193,6 +246,18 @@ fun StarfieldBackground(modifier: Modifier = Modifier) {
                 strokeWidth = 1.5.dp.toPx(),
             )
         }
+
+        drawRect(
+            brush = Brush.verticalGradient(
+                colorStops = arrayOf(
+                    0f to Color.Transparent,
+                    0.72f to Color.Transparent,
+                    1f to Color.Black.copy(alpha = 0.34f),
+                ),
+            ),
+            topLeft = Offset.Zero,
+            size = size,
+        )
     }
 }
 
@@ -208,6 +273,22 @@ private data class Nebula(
     val fracX: Float,
     val fracY: Float,
     val radiusDp: Dp,
+    val color: Color,
+    val alpha: Float,
+)
+
+private data class GalaxyGlow(
+    val t: Float,
+    val offsetDp: Dp,
+    val radiusDp: Dp,
+    val color: Color,
+    val alpha: Float,
+)
+
+private data class MilkyWayDust(
+    val t: Float,
+    val offsetDp: Dp,
+    val sizeDp: Dp,
     val color: Color,
     val alpha: Float,
 )
@@ -235,6 +316,28 @@ private fun generateStars(count: Int): List<Star> {
             phaseOffset = Random.nextFloat(),
         )
     }
+}
+
+private fun generateMilkyWayDust(count: Int): List<MilkyWayDust> = List(count) {
+    val nearCore = Random.nextFloat() < 0.72f
+    val offset = if (nearCore) {
+        Random.nextInt(-42, 43)
+    } else {
+        Random.nextInt(-112, 113)
+    }
+    val color = when (Random.nextInt(4)) {
+        0 -> Color(0xFFFFE6C8)
+        1 -> Color(0xFFD8ECFF)
+        2 -> Color.White
+        else -> Color(0xFF8EC7FF)
+    }
+    MilkyWayDust(
+        t = Random.nextFloat(),
+        offsetDp = offset.dp,
+        sizeDp = (0.55f + Random.nextFloat() * 1.35f).dp,
+        color = color,
+        alpha = 0.12f + Random.nextFloat() * 0.34f,
+    )
 }
 
 private fun generateNebulae(): List<Nebula> {

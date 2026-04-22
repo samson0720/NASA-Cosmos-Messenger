@@ -2,6 +2,7 @@ package io.github.samson0720.cosmosmessenger.feature.chat
 
 import android.app.Application
 import io.github.samson0720.cosmosmessenger.MainDispatcherRule
+import io.github.samson0720.cosmosmessenger.R
 import io.github.samson0720.cosmosmessenger.data.ApodRepository
 import io.github.samson0720.cosmosmessenger.domain.model.Apod
 import io.github.samson0720.cosmosmessenger.domain.model.ApodMediaType
@@ -56,13 +57,17 @@ class ChatViewModelTest {
 
         val state = viewModel.uiState.value
         assertEquals(listOf(null), repository.calls)
-        assertEquals(initialMessageCount + 2, state.messages.size)
+        assertEquals(initialMessageCount + 3, state.messages.size)
         assertEquals("", state.inputText)
         assertFalse(state.isSending)
 
-        val userMessage = state.messages[state.messages.lastIndex - 1]
+        val userMessage = state.messages[state.messages.lastIndex - 2]
         assertEquals(Sender.User, userMessage.sender)
         assertEquals(ChatContent.Text("show me today's APOD"), userMessage.content)
+
+        val intro = state.messages[state.messages.lastIndex - 1]
+        assertEquals(Sender.Nova, intro.sender)
+        assertEquals(ChatContent.Text(stringFor(R.string.nova_today_intro)), intro.content)
 
         val reply = state.messages.last()
         assertEquals(Sender.Nova, reply.sender)
@@ -99,8 +104,9 @@ class ChatViewModelTest {
 
         val state = viewModel.uiState.value
         assertEquals(listOf(LocalDate.of(2024, 1, 2)), repository.calls)
-        assertEquals(3, state.messages.size)
+        assertEquals(4, state.messages.size)
         assertFalse(state.isSending)
+        assertEquals(ChatContent.Text(stringFor(R.string.nova_date_intro)), state.messages[2].content)
         assertTrue(state.messages.last().content is ChatContent.ApodImage)
     }
 
@@ -114,10 +120,11 @@ class ChatViewModelTest {
 
         val state = viewModel.uiState.value
         assertEquals(listOf(LocalDate.of(2024, 1, 2)), repository.calls)
-        assertEquals(3, state.messages.size)
+        assertEquals(4, state.messages.size)
         assertEquals("", state.inputText)
         assertFalse(state.isSending)
         assertEquals(ChatContent.Text("2024-01-02"), state.messages[1].content)
+        assertEquals(ChatContent.Text(stringFor(R.string.nova_date_intro)), state.messages[2].content)
         assertTrue(state.messages.last().content is ChatContent.ApodImage)
     }
 
@@ -188,7 +195,7 @@ class ChatViewModelTest {
         application = Application(),
         repository = repository,
         favoritesRepository = favoritesRepository,
-        stringProvider = ChatStringProvider { resId -> "string-$resId" },
+        stringProvider = ChatStringProvider { resId -> stringFor(resId) },
     )
 
     private fun sampleApod(
@@ -250,4 +257,6 @@ class ChatViewModelTest {
 
         override suspend fun delete(date: LocalDate) = Unit
     }
+
+    private fun stringFor(resId: Int): String = "string-$resId"
 }

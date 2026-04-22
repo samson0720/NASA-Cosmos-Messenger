@@ -35,6 +35,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -108,6 +111,9 @@ private val BubbleNovaBorder = Color(0x406C5CE7)
 private val BubbleUserColor = Color(0xCC3A3178)
 private val BubbleUserBorder = Color(0x606C5CE7)
 private val ApodCardBorder = BorderStroke(0.5.dp, Color(0x3074B9FF))
+private val ApodPanelColor = Color(0x66101731)
+private val ApodActionColor = Color(0x1F74B9FF)
+private val ApodActionBorder = Color(0x4074B9FF)
 
 @Composable
 fun ChatRoute(
@@ -282,7 +288,7 @@ private fun MessageRow(
     val isUser = message.sender == Sender.User
     // User text bubbles stay compact; Nova bubbles hold APOD cards in a narrower frame
     // so the chat still feels like a conversation rather than a full-width gallery.
-    val maxWidth = if (isUser) 300.dp else 272.dp
+    val maxWidth = if (isUser) 300.dp else 326.dp
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
@@ -375,40 +381,78 @@ private fun ApodImageCard(
     onImageLongPress: () -> Unit,
 ) {
     val card = content.card
-    // Full-bleed hero image: the surrounding Bubble Surface shape already
-    // clips the rounded corners, so no extra clip/shape is needed here.
-    Column(modifier = Modifier.border(ApodCardBorder, RoundedCornerShape(16.dp))) {
+    val uriHandler = LocalUriHandler.current
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(ApodPanelColor)
+            .border(ApodCardBorder, RoundedCornerShape(16.dp)),
+    ) {
         if (card.imageUrl != null) {
-            AsyncImage(
-                model = card.imageUrl,
-                contentDescription = card.title,
-                contentScale = ContentScale.Crop,
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(190.dp)
+                    .height(210.dp)
+                    .background(Color(0xFF070A18))
                     .pointerInput(card.imageUrl) {
                         detectTapGestures(
                             onTap = { onImagePreviewClick(card) },
                             onLongPress = { onImageLongPress() },
                         )
                     },
-            )
+            ) {
+                AsyncImage(
+                    model = card.imageUrl,
+                    contentDescription = card.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(10.dp),
+                    shape = RoundedCornerShape(50),
+                    color = Color(0x99070A18),
+                    contentColor = Color.White,
+                    border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.22f)),
+                ) {
+                    Text(
+                        text = "APOD",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
+                    )
+                }
+            }
         }
-        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
             ApodHeader(card = card)
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(8.dp))
             Text(
                 text = card.explanation,
                 style = MaterialTheme.typography.bodySmall,
-                maxLines = 2,
+                color = Color.White.copy(alpha = 0.78f),
+                maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
-            Spacer(Modifier.height(8.dp))
-            TextButton(
-                onClick = { onBirthdayCardClick(content.payload) },
-                contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
+            Spacer(Modifier.height(12.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(stringResource(R.string.birthday_card_action))
+                ApodActionPill(
+                    text = stringResource(R.string.apod_image_preview_action),
+                    icon = Icons.Filled.Search,
+                    onClick = { onImagePreviewClick(card) },
+                )
+                ApodActionPill(
+                    text = stringResource(R.string.birthday_card_action_short),
+                    icon = Icons.Filled.Share,
+                    onClick = { onBirthdayCardClick(content.payload) },
+                )
+                ApodTextAction(
+                    text = stringResource(R.string.apod_original_action),
+                    onClick = { uriHandler.openUri(card.sourceUrl) },
+                )
             }
         }
     }
@@ -494,25 +538,25 @@ private fun ApodVideoCard(card: ApodCard) {
     val uriHandler = LocalUriHandler.current
     Column(
         modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(ApodPanelColor)
             .border(ApodCardBorder, RoundedCornerShape(16.dp))
-            .padding(12.dp),
+            .padding(14.dp),
     ) {
         ApodHeader(card = card)
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(8.dp))
         Text(
             text = card.explanation,
             style = MaterialTheme.typography.bodySmall,
-            maxLines = 2,
+            color = Color.White.copy(alpha = 0.78f),
+            maxLines = 3,
             overflow = TextOverflow.Ellipsis,
         )
-        Spacer(Modifier.height(8.dp))
-        Text(
+        Spacer(Modifier.height(12.dp))
+        ApodActionPill(
             text = stringResource(R.string.apod_video_watch),
-            style = MaterialTheme.typography.labelLarge.copy(
-                textDecoration = TextDecoration.Underline,
-            ),
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.clickable { uriHandler.openUri(card.sourceUrl) },
+            icon = Icons.Filled.PlayArrow,
+            onClick = { uriHandler.openUri(card.sourceUrl) },
         )
     }
 }
@@ -521,8 +565,11 @@ private fun ApodVideoCard(card: ApodCard) {
 private fun ApodHeader(card: ApodCard) {
     Text(
         text = card.title,
-        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
     )
+    Spacer(Modifier.height(4.dp))
     Row(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -547,6 +594,56 @@ private fun ApodHeader(card: ApodCard) {
             }
         }
     }
+}
+
+@Composable
+private fun ApodActionPill(
+    text: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = ApodActionColor,
+        contentColor = MaterialTheme.colorScheme.primary,
+        border = BorderStroke(0.5.dp, ApodActionBorder),
+        modifier = Modifier
+            .heightIn(min = 34.dp)
+            .clickable(onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(15.dp),
+            )
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ApodTextAction(
+    text: String,
+    onClick: () -> Unit,
+) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium.copy(
+            fontWeight = FontWeight.SemiBold,
+            textDecoration = TextDecoration.Underline,
+        ),
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.clickable(onClick = onClick),
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
