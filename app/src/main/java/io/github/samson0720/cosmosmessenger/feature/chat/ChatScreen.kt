@@ -79,7 +79,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -288,7 +287,13 @@ private fun MessageRow(
     val isUser = message.sender == Sender.User
     // User text bubbles stay compact; Nova bubbles hold APOD cards in a narrower frame
     // so the chat still feels like a conversation rather than a full-width gallery.
-    val maxWidth = if (isUser) 300.dp else 326.dp
+    val isApod = message.content is ChatContent.ApodImage ||
+        message.content is ChatContent.ApodVideo
+    val maxWidth = when {
+        isUser -> 300.dp
+        isApod -> 292.dp
+        else -> 326.dp
+    }
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
@@ -392,7 +397,7 @@ private fun ApodImageCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(210.dp)
+                    .height(174.dp)
                     .background(Color(0xFF070A18))
                     .pointerInput(card.imageUrl) {
                         detectTapGestures(
@@ -424,17 +429,17 @@ private fun ApodImageCard(
                 }
             }
         }
-        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
-            ApodHeader(card = card)
-            Spacer(Modifier.height(8.dp))
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+            ApodImageMeta(card = card)
+            Spacer(Modifier.height(6.dp))
             Text(
                 text = card.explanation,
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.78f),
-                maxLines = 3,
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.White.copy(alpha = 0.72f),
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(10.dp))
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -449,8 +454,9 @@ private fun ApodImageCard(
                     icon = Icons.Filled.Share,
                     onClick = { onBirthdayCardClick(content.payload) },
                 )
-                ApodTextAction(
+                ApodActionSymbolPill(
                     text = stringResource(R.string.apod_original_action),
+                    symbol = "↗",
                     onClick = { uriHandler.openUri(card.sourceUrl) },
                 )
             }
@@ -562,6 +568,33 @@ private fun ApodVideoCard(card: ApodCard) {
 }
 
 @Composable
+private fun ApodImageMeta(card: ApodCard) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = card.displayDate,
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+            color = Color.White.copy(alpha = 0.88f),
+        )
+        if (card.isFromCache) {
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+                contentColor = MaterialTheme.colorScheme.primary,
+            ) {
+                Text(
+                    text = stringResource(R.string.apod_cache_badge),
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun ApodHeader(card: ApodCard) {
     Text(
         text = card.title,
@@ -631,19 +664,37 @@ private fun ApodActionPill(
 }
 
 @Composable
-private fun ApodTextAction(
+private fun ApodActionSymbolPill(
     text: String,
+    symbol: String,
     onClick: () -> Unit,
 ) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelMedium.copy(
-            fontWeight = FontWeight.SemiBold,
-            textDecoration = TextDecoration.Underline,
-        ),
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.clickable(onClick = onClick),
-    )
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = ApodActionColor,
+        contentColor = MaterialTheme.colorScheme.primary,
+        border = BorderStroke(0.5.dp, ApodActionBorder),
+        modifier = Modifier
+            .heightIn(min = 34.dp)
+            .clickable(onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = symbol,
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                maxLines = 1,
+            )
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                maxLines = 1,
+            )
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

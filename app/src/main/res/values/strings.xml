@@ -28,7 +28,7 @@
     <string name="apod_image_preview_action">預覽</string>
     <string name="apod_image_preview_open">開啟原圖</string>
     <string name="apod_image_preview_close">關閉預覽</string>
-    <string name="apod_original_action">原圖</string>
+    <string name="apod_original_action">開原圖</string>
     <string name="birthday_card_action">製作生日星空卡</string>
     <string name="birthday_card_action_short">星空卡</string>
     <string name="birthday_card_dialog_title">生日星空卡</string>
@@ -37,6 +37,7 @@
     <string name="birthday_card_close">關閉</string>
     <string name="birthday_card_error">無法生成生日星空卡，請稍後再試。</string>
     <string name="birthday_card_share_title">分享生日星空卡</string>
+    <string name="birthday_card_share_text">我的生日星空卡 - %1$s（%2$s）</string>
     <string name="birthday_card_preview_description">生日星空卡預覽</string>
 
     <!-- Favorite save feedback -->

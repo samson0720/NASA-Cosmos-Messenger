@@ -12,7 +12,7 @@ class ZodiacAccentResolverTest {
         val accent = ZodiacAccentResolver.resolve(LocalDate.of(2024, 1, 20))
 
         assertEquals(ZodiacSign.Aquarius, accent.sign)
-        assertTrue(accent.label.contains("Aquarius"))
+        assertTrue(accent.label.contains("水瓶座"))
     }
 
     @Test
@@ -20,7 +20,7 @@ class ZodiacAccentResolverTest {
         val accent = ZodiacAccentResolver.resolve(LocalDate.of(2024, 7, 23))
 
         assertEquals(ZodiacSign.Leo, accent.sign)
-        assertTrue(accent.label.contains("Leo"))
+        assertTrue(accent.label.contains("獅子座"))
     }
 
     @Test
@@ -28,6 +28,6 @@ class ZodiacAccentResolverTest {
         val accent = ZodiacAccentResolver.resolve(LocalDate.of(2024, 12, 31))
 
         assertEquals(ZodiacSign.Capricorn, accent.sign)
-        assertTrue(accent.label.contains("Capricorn"))
+        assertTrue(accent.label.contains("摩羯座"))
     }
 }

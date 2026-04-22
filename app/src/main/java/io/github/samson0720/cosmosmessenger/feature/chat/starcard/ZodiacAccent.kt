@@ -46,18 +46,18 @@ object ZodiacAccentResolver {
     }
 
     private fun ZodiacSign.toAccent(): ZodiacAccent = when (this) {
-        ZodiacSign.Capricorn -> ZodiacAccent(this, "Capricorn Birthday Sky", "Earth-toned midnight orbit", 0xFF8FA7A3.toInt())
-        ZodiacSign.Aquarius -> ZodiacAccent(this, "Aquarius Birthday Sky", "Electric blue constellation trail", 0xFF74B9FF.toInt())
-        ZodiacSign.Pisces -> ZodiacAccent(this, "Pisces Birthday Sky", "Soft nebula tide", 0xFF9B8CFF.toInt())
-        ZodiacSign.Aries -> ZodiacAccent(this, "Aries Birthday Sky", "A bright launch spark", 0xFFFF7A7A.toInt())
-        ZodiacSign.Taurus -> ZodiacAccent(this, "Taurus Birthday Sky", "A calm stellar horizon", 0xFF8FD6A3.toInt())
-        ZodiacSign.Gemini -> ZodiacAccent(this, "Gemini Birthday Sky", "Twin points of starlight", 0xFFFFD166.toInt())
-        ZodiacSign.Cancer -> ZodiacAccent(this, "Cancer Birthday Sky", "Moonlit cosmic shore", 0xFFB8D8FF.toInt())
-        ZodiacSign.Leo -> ZodiacAccent(this, "Leo Birthday Sky", "Golden solar flare", 0xFFFFB84D.toInt())
-        ZodiacSign.Virgo -> ZodiacAccent(this, "Virgo Birthday Sky", "Clean celestial line", 0xFFA8E6CF.toInt())
-        ZodiacSign.Libra -> ZodiacAccent(this, "Libra Birthday Sky", "Balanced violet glow", 0xFFD0A2F7.toInt())
-        ZodiacSign.Scorpio -> ZodiacAccent(this, "Scorpio Birthday Sky", "Deep crimson starfield", 0xFFFF6B9A.toInt())
-        ZodiacSign.Sagittarius -> ZodiacAccent(this, "Sagittarius Birthday Sky", "Far-traveling comet arc", 0xFFFFC857.toInt())
+        ZodiacSign.Capricorn -> ZodiacAccent(this, "摩羯座生日星空", "沉穩土象星軌", 0xFF8FA7A3.toInt())
+        ZodiacSign.Aquarius -> ZodiacAccent(this, "水瓶座生日星空", "藍色星群軌跡", 0xFF74B9FF.toInt())
+        ZodiacSign.Pisces -> ZodiacAccent(this, "雙魚座生日星空", "柔和星雲潮汐", 0xFF9B8CFF.toInt())
+        ZodiacSign.Aries -> ZodiacAccent(this, "牡羊座生日星空", "明亮啟程火花", 0xFFFF7A7A.toInt())
+        ZodiacSign.Taurus -> ZodiacAccent(this, "金牛座生日星空", "安定恆星地平線", 0xFF8FD6A3.toInt())
+        ZodiacSign.Gemini -> ZodiacAccent(this, "雙子座生日星空", "雙星交會光點", 0xFFFFD166.toInt())
+        ZodiacSign.Cancer -> ZodiacAccent(this, "巨蟹座生日星空", "月光宇宙海岸", 0xFFB8D8FF.toInt())
+        ZodiacSign.Leo -> ZodiacAccent(this, "獅子座生日星空", "金色太陽閃焰", 0xFFFFB84D.toInt())
+        ZodiacSign.Virgo -> ZodiacAccent(this, "處女座生日星空", "清晰星辰線條", 0xFFA8E6CF.toInt())
+        ZodiacSign.Libra -> ZodiacAccent(this, "天秤座生日星空", "平衡柔紫光暈", 0xFFD0A2F7.toInt())
+        ZodiacSign.Scorpio -> ZodiacAccent(this, "天蠍座生日星空", "深紅星野", 0xFFFF6B9A.toInt())
+        ZodiacSign.Sagittarius -> ZodiacAccent(this, "射手座生日星空", "遠行彗星弧線", 0xFFFFC857.toInt())
     }
 
     private fun LocalDate.isBetween(
