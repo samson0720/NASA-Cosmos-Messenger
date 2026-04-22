@@ -25,10 +25,17 @@
     <!-- APOD card actions -->
     <string name="apod_video_watch">觀看影片</string>
     <string name="apod_cache_badge">Offline cache</string>
-    <string name="apod_image_preview_action">預覽</string>
-    <string name="apod_image_preview_open">開啟原圖</string>
-    <string name="apod_image_preview_close">關閉預覽</string>
-    <string name="apod_original_action">開原圖</string>
+    <string name="apod_image_preview_action">看圖解說</string>
+    <string name="apod_image_preview_open">高清圖</string>
+    <string name="apod_image_preview_close">關閉看圖解說</string>
+    <string name="apod_detail_nova_tab">Nova 解說</string>
+    <string name="apod_detail_nasa_tab">NASA 原文</string>
+    <string name="apod_detail_nova_loading">Nova 正在整理 NASA 的原文…</string>
+    <string name="apod_detail_nova_not_configured">尚未設定 Nova Guide endpoint。可以先切到 NASA 原文閱讀官方說明。</string>
+    <string name="apod_detail_nova_failed">Nova 解說暫時產生失敗，請稍後再試或切到 NASA 原文。</string>
+    <string name="apod_detail_key_points">三個重點</string>
+    <string name="apod_detail_terms">名詞小抄</string>
+    <string name="apod_detail_source">來源：%1$s</string>
     <string name="birthday_card_action">製作生日星空卡</string>
     <string name="birthday_card_action_short">星空卡</string>
     <string name="birthday_card_dialog_title">生日星空卡</string>

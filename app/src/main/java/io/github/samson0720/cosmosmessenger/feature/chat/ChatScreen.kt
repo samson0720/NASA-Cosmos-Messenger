@@ -6,6 +6,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -88,8 +90,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import io.github.samson0720.cosmosmessenger.R
+import io.github.samson0720.cosmosmessenger.data.NovaGuideException
 import io.github.samson0720.cosmosmessenger.domain.model.Apod
 import io.github.samson0720.cosmosmessenger.domain.model.ApodMediaType
+import io.github.samson0720.cosmosmessenger.domain.model.NovaGuide
 import io.github.samson0720.cosmosmessenger.feature.chat.model.ApodCard
 import io.github.samson0720.cosmosmessenger.feature.chat.model.ChatContent
 import io.github.samson0720.cosmosmessenger.feature.chat.model.ChatMessage
@@ -114,6 +118,28 @@ private val ApodPanelColor = Color(0x66101731)
 private val ApodActionColor = Color(0x1F74B9FF)
 private val ApodActionBorder = Color(0x4074B9FF)
 
+private enum class ApodDetailTab {
+    Nova,
+    Nasa,
+}
+
+private data class ApodDetailDialogState(
+    val card: ApodCard,
+    val apod: Apod,
+    val guideState: NovaGuideUiState,
+)
+
+private sealed interface NovaGuideUiState {
+    data object Loading : NovaGuideUiState
+    data class Ready(val guide: NovaGuide) : NovaGuideUiState
+    data class Error(val reason: NovaGuideError) : NovaGuideUiState
+}
+
+private enum class NovaGuideError {
+    NotConfigured,
+    Failed,
+}
+
 @Composable
 fun ChatRoute(
     modifier: Modifier = Modifier,
@@ -126,6 +152,7 @@ fun ChatRoute(
         onSendClick = viewModel::onSendClick,
         onDatePicked = viewModel::onDatePicked,
         onApodLongPress = viewModel::onApodLongPress,
+        onNovaGuideRequest = viewModel::generateNovaGuide,
         onFeedbackShown = viewModel::consumeFeedback,
         modifier = modifier,
     )
@@ -138,6 +165,7 @@ fun ChatScreen(
     onSendClick: () -> Unit,
     onDatePicked: (LocalDate) -> Unit,
     onApodLongPress: (ChatMessage) -> Unit,
+    onNovaGuideRequest: suspend (Apod) -> Result<NovaGuide>,
     onFeedbackShown: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -153,8 +181,8 @@ fun ChatScreen(
     var birthdayCardState by remember {
         mutableStateOf<BirthdayCardDialogState?>(null)
     }
-    var imagePreviewCard by remember {
-        mutableStateOf<ApodCard?>(null)
+    var apodDetailState by remember {
+        mutableStateOf<ApodDetailDialogState?>(null)
     }
     val onBirthdayCardClick: (Apod) -> Unit = { apod ->
         birthdayCardState = BirthdayCardDialogState.Loading
@@ -164,6 +192,30 @@ fun ChatScreen(
                     onSuccess = { BirthdayCardDialogState.Ready(it) },
                     onFailure = { BirthdayCardDialogState.Error },
                 )
+        }
+    }
+    val onApodDetailClick: (ApodCard, Apod) -> Unit = { card, apod ->
+        apodDetailState = ApodDetailDialogState(
+            card = card,
+            apod = apod,
+            guideState = NovaGuideUiState.Loading,
+        )
+        scope.launch {
+            val guideState = onNovaGuideRequest(apod).fold(
+                onSuccess = { NovaGuideUiState.Ready(it) },
+                onFailure = { error ->
+                    NovaGuideUiState.Error(
+                        if (error is NovaGuideException.NotConfigured) {
+                            NovaGuideError.NotConfigured
+                        } else {
+                            NovaGuideError.Failed
+                        },
+                    )
+                },
+            )
+            apodDetailState = apodDetailState
+                ?.takeIf { it.apod.date == apod.date && it.card.title == card.title }
+                ?.copy(guideState = guideState)
         }
     }
 
@@ -223,7 +275,7 @@ fun ChatScreen(
                     message = message,
                     onApodLongPress = onApodLongPress,
                     onBirthdayCardClick = onBirthdayCardClick,
-                    onImagePreviewClick = { imagePreviewCard = it },
+                    onImagePreviewClick = onApodDetailClick,
                 )
             }
         }
@@ -269,10 +321,10 @@ fun ChatScreen(
         )
     }
 
-    imagePreviewCard?.let { card ->
+    apodDetailState?.let { detail ->
         ApodImagePreviewDialog(
-            card = card,
-            onDismiss = { imagePreviewCard = null },
+            state = detail,
+            onDismiss = { apodDetailState = null },
         )
     }
 }
@@ -282,7 +334,7 @@ private fun MessageRow(
     message: ChatMessage,
     onApodLongPress: (ChatMessage) -> Unit,
     onBirthdayCardClick: (Apod) -> Unit,
-    onImagePreviewClick: (ApodCard) -> Unit,
+    onImagePreviewClick: (ApodCard, Apod) -> Unit,
 ) {
     val isUser = message.sender == Sender.User
     // User text bubbles stay compact; Nova bubbles hold APOD cards in a narrower frame
@@ -315,7 +367,7 @@ private fun Bubble(
     isUser: Boolean,
     onApodLongPress: (ChatMessage) -> Unit,
     onBirthdayCardClick: (Apod) -> Unit,
-    onImagePreviewClick: (ApodCard) -> Unit,
+    onImagePreviewClick: (ApodCard, Apod) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val shape = if (isUser) {
@@ -382,11 +434,11 @@ private fun Bubble(
 private fun ApodImageCard(
     content: ChatContent.ApodImage,
     onBirthdayCardClick: (Apod) -> Unit,
-    onImagePreviewClick: (ApodCard) -> Unit,
+    onImagePreviewClick: (ApodCard, Apod) -> Unit,
     onImageLongPress: () -> Unit,
 ) {
     val card = content.card
-    val uriHandler = LocalUriHandler.current
+    val apod = content.payload
     Column(
         modifier = Modifier
             .clip(RoundedCornerShape(16.dp))
@@ -401,7 +453,7 @@ private fun ApodImageCard(
                     .background(Color(0xFF070A18))
                     .pointerInput(card.imageUrl) {
                         detectTapGestures(
-                            onTap = { onImagePreviewClick(card) },
+                            onTap = { onImagePreviewClick(card, apod) },
                             onLongPress = { onImageLongPress() },
                         )
                     },
@@ -447,17 +499,12 @@ private fun ApodImageCard(
                 ApodActionPill(
                     text = stringResource(R.string.apod_image_preview_action),
                     icon = Icons.Filled.Search,
-                    onClick = { onImagePreviewClick(card) },
+                    onClick = { onImagePreviewClick(card, apod) },
                 )
                 ApodActionPill(
                     text = stringResource(R.string.birthday_card_action_short),
                     icon = Icons.Filled.Share,
                     onClick = { onBirthdayCardClick(content.payload) },
-                )
-                ApodActionSymbolPill(
-                    text = stringResource(R.string.apod_original_action),
-                    symbol = "↗",
-                    onClick = { uriHandler.openUri(card.sourceUrl) },
                 )
             }
         }
@@ -466,10 +513,12 @@ private fun ApodImageCard(
 
 @Composable
 private fun ApodImagePreviewDialog(
-    card: ApodCard,
+    state: ApodDetailDialogState,
     onDismiss: () -> Unit,
 ) {
+    val card = state.card
     val uriHandler = LocalUriHandler.current
+    var selectedTab by remember(card) { mutableStateOf(ApodDetailTab.Nova) }
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
@@ -515,7 +564,7 @@ private fun ApodImagePreviewDialog(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .padding(vertical = 18.dp),
+                        .padding(top = 14.dp, bottom = 12.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     AsyncImage(
@@ -525,16 +574,179 @@ private fun ApodImagePreviewDialog(
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    color = Color(0x66101731),
+                    contentColor = Color.White,
+                    border = ApodCardBorder,
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            ApodDetailTabButton(
+                                text = stringResource(R.string.apod_detail_nova_tab),
+                                selected = selectedTab == ApodDetailTab.Nova,
+                                onClick = { selectedTab = ApodDetailTab.Nova },
+                                modifier = Modifier.weight(1f),
+                            )
+                            ApodDetailTabButton(
+                                text = stringResource(R.string.apod_detail_nasa_tab),
+                                selected = selectedTab == ApodDetailTab.Nasa,
+                                onClick = { selectedTab = ApodDetailTab.Nasa },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        when (selectedTab) {
+                            ApodDetailTab.Nova -> NovaGuideContent(state.guideState)
+                            ApodDetailTab.Nasa -> Text(
+                                text = card.explanation,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.78f),
+                                modifier = Modifier
+                                    .heightIn(max = 132.dp)
+                                    .verticalScroll(rememberScrollState()),
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    TextButton(onClick = onDismiss) {
+                        Text(stringResource(R.string.birthday_card_close))
+                    }
                     TextButton(onClick = { uriHandler.openUri(card.sourceUrl) }) {
                         Text(stringResource(R.string.apod_image_preview_open))
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun NovaGuideContent(state: NovaGuideUiState) {
+    when (state) {
+        NovaGuideUiState.Loading -> Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 96.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                text = stringResource(R.string.apod_detail_nova_loading),
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.72f),
+            )
+        }
+        is NovaGuideUiState.Error -> Text(
+            text = stringResource(
+                when (state.reason) {
+                    NovaGuideError.NotConfigured -> R.string.apod_detail_nova_not_configured
+                    NovaGuideError.Failed -> R.string.apod_detail_nova_failed
+                },
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.White.copy(alpha = 0.74f),
+            modifier = Modifier.heightIn(min = 96.dp),
+        )
+        is NovaGuideUiState.Ready -> NovaGuideReadyContent(state.guide)
+    }
+}
+
+@Composable
+private fun NovaGuideReadyContent(guide: NovaGuide) {
+    Column(
+        modifier = Modifier
+            .heightIn(max = 168.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = guide.shortSummary,
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = Color.White.copy(alpha = 0.9f),
+        )
+        Text(
+            text = guide.plainChinese,
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.White.copy(alpha = 0.78f),
+        )
+        Text(
+            text = stringResource(R.string.apod_detail_key_points),
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = Color.White.copy(alpha = 0.86f),
+        )
+        guide.keyPoints.forEach { point ->
+            Text(
+                text = "• $point",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.76f),
+            )
+        }
+        if (guide.terms.isNotEmpty()) {
+            Text(
+                text = stringResource(R.string.apod_detail_terms),
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = Color.White.copy(alpha = 0.86f),
+            )
+            guide.terms.forEach { term ->
+                Text(
+                    text = "${term.term} / ${term.zh}: ${term.explanation}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.76f),
+                )
+            }
+        }
+        Text(
+            text = stringResource(R.string.apod_detail_source, guide.source),
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White.copy(alpha = 0.54f),
+        )
+    }
+}
+
+@Composable
+private fun ApodDetailTabButton(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier
+            .height(36.dp)
+            .clip(RoundedCornerShape(50))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(50),
+        color = if (selected) Color(0x3326C6DA) else Color.Transparent,
+        contentColor = if (selected) Color.White else Color.White.copy(alpha = 0.62f),
+        border = BorderStroke(0.5.dp, if (selected) Color(0x8074B9FF) else Color(0x2674B9FF)),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 10.dp),
+            )
         }
     }
 }
@@ -653,40 +865,6 @@ private fun ApodActionPill(
                 imageVector = icon,
                 contentDescription = null,
                 modifier = Modifier.size(15.dp),
-            )
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                maxLines = 1,
-            )
-        }
-    }
-}
-
-@Composable
-private fun ApodActionSymbolPill(
-    text: String,
-    symbol: String,
-    onClick: () -> Unit,
-) {
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = ApodActionColor,
-        contentColor = MaterialTheme.colorScheme.primary,
-        border = BorderStroke(0.5.dp, ApodActionBorder),
-        modifier = Modifier
-            .heightIn(min = 34.dp)
-            .clickable(onClick = onClick),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = symbol,
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                maxLines = 1,
             )
             Text(
                 text = text,
@@ -1070,6 +1248,17 @@ private fun ChatScreenPreview() {
             onSendClick = {},
             onDatePicked = {},
             onApodLongPress = {},
+            onNovaGuideRequest = {
+                Result.success(
+                    NovaGuide(
+                        shortSummary = "仙女座星系是離銀河系最近的大型螺旋星系。",
+                        plainChinese = "這張圖展示仙女座星系。它和我們的銀河系很接近，也是夜空中最有代表性的深空天體之一。",
+                        keyPoints = listOf("主角是仙女座星系", "它是大型螺旋星系", "距離銀河系約數百萬光年"),
+                        terms = emptyList(),
+                        source = "NASA APOD explanation",
+                    ),
+                )
+            },
             onFeedbackShown = {},
         )
     }

@@ -4,10 +4,12 @@ import android.app.Application
 import io.github.samson0720.cosmosmessenger.MainDispatcherRule
 import io.github.samson0720.cosmosmessenger.R
 import io.github.samson0720.cosmosmessenger.data.ApodRepository
+import io.github.samson0720.cosmosmessenger.data.NovaGuideRepository
 import io.github.samson0720.cosmosmessenger.domain.model.Apod
 import io.github.samson0720.cosmosmessenger.domain.model.ApodMediaType
 import io.github.samson0720.cosmosmessenger.domain.model.ApodSource
 import io.github.samson0720.cosmosmessenger.domain.model.FavoriteApod
+import io.github.samson0720.cosmosmessenger.domain.model.NovaGuide
 import io.github.samson0720.cosmosmessenger.domain.repository.FavoritesRepository
 import io.github.samson0720.cosmosmessenger.domain.repository.SaveResult
 import io.github.samson0720.cosmosmessenger.feature.chat.model.ApodCard
@@ -188,12 +190,27 @@ class ChatViewModelTest {
         assertNull(viewModel.uiState.value.feedback)
     }
 
+    @Test
+    fun generateNovaGuide_delegatesToGuideRepository() = runTest {
+        val apod = sampleApod()
+        val guide = sampleGuide()
+        val guideRepository = FakeNovaGuideRepository(Result.success(guide))
+        val viewModel = newViewModel(guideRepository = guideRepository)
+
+        val result = viewModel.generateNovaGuide(apod)
+
+        assertEquals(listOf(apod), guideRepository.calls)
+        assertEquals(Result.success(guide), result)
+    }
+
     private fun newViewModel(
         repository: FakeApodRepository = FakeApodRepository(),
+        guideRepository: FakeNovaGuideRepository = FakeNovaGuideRepository(),
         favoritesRepository: FakeFavoritesRepository = FakeFavoritesRepository(),
     ): ChatViewModel = ChatViewModel(
         application = Application(),
         repository = repository,
+        novaGuideRepository = guideRepository,
         favoritesRepository = favoritesRepository,
         stringProvider = ChatStringProvider { resId -> stringFor(resId) },
     )
@@ -230,6 +247,14 @@ class ChatViewModelTest {
         assertEquals(apod.source == ApodSource.CACHE, card.isFromCache)
     }
 
+    private fun sampleGuide(): NovaGuide = NovaGuide(
+        shortSummary = "一張宇宙照片的白話摘要。",
+        plainChinese = "這裡用簡短中文說明 NASA APOD 原文。",
+        keyPoints = listOf("重點一", "重點二", "重點三"),
+        terms = emptyList(),
+        source = "NASA APOD explanation",
+    )
+
     private class FakeApodRepository(
         private val result: Result<Apod> = Result.failure(
             IllegalStateException("No APOD result configured"),
@@ -239,6 +264,19 @@ class ChatViewModelTest {
 
         override suspend fun getApod(date: LocalDate?): Result<Apod> {
             calls += date
+            return result
+        }
+    }
+
+    private class FakeNovaGuideRepository(
+        private val result: Result<NovaGuide> = Result.failure(
+            IllegalStateException("No Nova guide result configured"),
+        ),
+    ) : NovaGuideRepository {
+        val calls = mutableListOf<Apod>()
+
+        override suspend fun explain(apod: Apod): Result<NovaGuide> {
+            calls += apod
             return result
         }
     }

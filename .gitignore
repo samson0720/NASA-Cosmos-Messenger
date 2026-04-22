@@ -20,6 +20,12 @@ Thumbs.db
 # --- Logs ---
 *.log
 
+# --- Python backend local files ---
+__pycache__/
+*.py[cod]
+/nova-guide-backend/.venv/
+/nova-guide-backend/.env
+
 # --- Keystore (never commit signing keys) ---
 *.jks
 *.keystore

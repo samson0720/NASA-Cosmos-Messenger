@@ -11,12 +11,15 @@ import io.github.samson0720.cosmosmessenger.R
 import io.github.samson0720.cosmosmessenger.data.ApodException
 import io.github.samson0720.cosmosmessenger.data.ApodRepository
 import io.github.samson0720.cosmosmessenger.data.ApodRepositoryImpl
+import io.github.samson0720.cosmosmessenger.data.NovaGuideRepository
+import io.github.samson0720.cosmosmessenger.data.NovaGuideRepositoryImpl
 import io.github.samson0720.cosmosmessenger.data.local.DatabaseModule
 import io.github.samson0720.cosmosmessenger.data.remote.NetworkModule
 import io.github.samson0720.cosmosmessenger.data.repository.FavoritesRepositoryImpl
 import io.github.samson0720.cosmosmessenger.domain.model.Apod
 import io.github.samson0720.cosmosmessenger.domain.model.ApodMediaType
 import io.github.samson0720.cosmosmessenger.domain.model.ApodSource
+import io.github.samson0720.cosmosmessenger.domain.model.NovaGuide
 import io.github.samson0720.cosmosmessenger.domain.repository.FavoritesRepository
 import io.github.samson0720.cosmosmessenger.domain.repository.SaveResult
 import io.github.samson0720.cosmosmessenger.feature.chat.model.ApodCard
@@ -66,6 +69,7 @@ data class ChatUiState(
 class ChatViewModel(
     application: Application,
     private val repository: ApodRepository,
+    private val novaGuideRepository: NovaGuideRepository,
     private val favoritesRepository: FavoritesRepository,
     private val stringProvider: ChatStringProvider = AndroidChatStringProvider(application),
 ) : AndroidViewModel(application) {
@@ -158,6 +162,9 @@ class ChatViewModel(
         _uiState.update { it.copy(feedback = null) }
     }
 
+    suspend fun generateNovaGuide(apod: Apod): Result<NovaGuide> =
+        novaGuideRepository.explain(apod)
+
     private suspend fun buildRepliesFor(input: String): List<ChatMessage> {
         val dateResult = ApodDateParser.extract(input)
         val target = when (dateResult) {
@@ -248,10 +255,14 @@ class ChatViewModel(
                     apiKey = BuildConfig.NASA_API_KEY,
                     cacheDao = database.cachedApodDao(),
                 )
+                val novaGuideRepository = NovaGuideRepositoryImpl(
+                    service = NetworkModule.novaGuideService,
+                    endpoint = BuildConfig.NOVA_GUIDE_ENDPOINT,
+                )
                 val favoritesRepository = FavoritesRepositoryImpl(
                     dao = database.favoriteApodDao(),
                 )
-                ChatViewModel(app, apodRepository, favoritesRepository)
+                ChatViewModel(app, apodRepository, novaGuideRepository, favoritesRepository)
             }
         }
     }

@@ -18,6 +18,20 @@ val nasaApiKey: String = run {
     props.getProperty("NASA_API_KEY")?.takeIf { it.isNotBlank() } ?: "DEMO_KEY"
 }
 
+// Optional backend endpoint for Nova's LLM-powered APOD guide.
+// Keep the LLM provider key on that backend, never in the Android app.
+val novaGuideEndpoint: String = run {
+    val props = Properties()
+    val file = rootProject.file("local.properties")
+    if (file.exists()) {
+        file.inputStream().use { props.load(it) }
+    }
+    props.getProperty("NOVA_GUIDE_ENDPOINT")?.takeIf { it.isNotBlank() } ?: ""
+}
+
+fun String.asBuildConfigString(): String =
+    replace("\\", "\\\\").replace("\"", "\\\"")
+
 android {
     namespace = "io.github.samson0720.cosmosmessenger"
     compileSdk = 34
@@ -33,6 +47,7 @@ android {
         vectorDrawables { useSupportLibrary = true }
 
         buildConfigField("String", "NASA_API_KEY", "\"$nasaApiKey\"")
+        buildConfigField("String", "NOVA_GUIDE_ENDPOINT", "\"${novaGuideEndpoint.asBuildConfigString()}\"")
     }
 
     buildTypes {

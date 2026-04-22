@@ -1,8 +1,8 @@
 # NASA Cosmos Messenger
 
-一個以對話形式瀏覽 NASA Astronomy Picture of the Day（APOD）的 Android App。使用者可以在 Nova 對話頁輸入一般訊息或指定日期，取得對應的每日天文圖片；喜歡的 APOD 卡片可長按收藏，並在收藏頁瀏覽與刪除。
+一個以對話形式瀏覽 NASA Astronomy Picture of the Day（APOD）的 Android App。使用者可以在 Nova 對話頁輸入一般訊息或指定日期，取得對應的每日天文圖片；喜歡的 APOD 卡片可長按收藏，並在收藏頁瀏覽與刪除。圖片 APOD 也能開啟 Nova Guide，把 NASA 原文壓縮成繁體中文白話解說，並保留 NASA 原文切換。
 
-本專案使用 Kotlin、Jetpack Compose、Retrofit、Moshi 與 Room 實作，重點放在清楚的資料分層、穩定的日期解析、可恢復的錯誤處理，以及本機收藏保存。
+本專案使用 Kotlin、Jetpack Compose、Retrofit、Moshi、Room 與一個小型 Flask + Groq LLM gateway 實作，重點放在清楚的資料分層、穩定的日期解析、可恢復的錯誤處理、API key 安全邊界，以及本機收藏保存。
 
 ## 專案展示
 
@@ -31,6 +31,8 @@
 | 日期辨識 | 從使用者訊息中擷取支援格式的日期 | 完成 |
 | 對話介面 | 使用者訊息靠右、Nova 回覆靠左，新訊息自動捲到底部 | 完成 |
 | 圖片 APOD 卡片 | 顯示圖片、標題、日期與說明摘要 | 完成 |
+| Nova Guide | 預覽 APOD 大圖，並切換 Groq JSON schema 白話解說 / NASA 原文 | 完成 |
+| 生日星空卡 | 將生日當天 APOD 合成星座風格分享卡 | 完成 |
 | 影片 APOD 處理 | 以外部連結開啟影片來源 | 完成 |
 | 長按收藏 | 長按 Nova 的 APOD 卡片加入收藏 | 完成 |
 | 本機收藏 | 使用 Room 保存收藏資料 | 完成 |
@@ -51,12 +53,17 @@ flowchart TD
     FavoritesRoute --> FavoritesViewModel
 
     ChatViewModel --> ApodRepository
+    ChatViewModel --> NovaGuideRepository
     ChatViewModel --> FavoritesRepository
     FavoritesViewModel --> FavoritesRepository
 
     ApodRepository --> ApodRepositoryImpl
     ApodRepositoryImpl --> ApodService
     ApodService --> NASA_APOD_API
+
+    NovaGuideRepository --> NovaGuideRepositoryImpl
+    NovaGuideRepositoryImpl --> NovaGuideBackend
+    NovaGuideBackend --> Groq_Chat_Completions_API
 
     FavoritesRepository --> FavoritesRepositoryImpl
     FavoritesRepositoryImpl --> FavoriteApodDao
@@ -77,6 +84,7 @@ feature/favorites 收藏 UI 與狀態管理
 navigation      Bottom navigation 與 tab destination
 ui              共用 UI 元件與 theme
 util            日期解析與格式化
+nova-guide-backend Flask LLM gateway，保護 LLM provider API key
 ```
 
 ### 架構選擇
@@ -87,6 +95,7 @@ util            日期解析與格式化
 - **集中日期規則**：所有 APOD 日期解析、格式化與範圍檢查都在 `ApodDateParser`。
 - **Room 以日期作為主鍵**：APOD 每天只有一筆，日期是自然識別；重複收藏可直接透過 `OnConflictStrategy.IGNORE` 處理。
 - **網路錯誤分類**：Repository 將 HTTP / IO 例外轉成 app 可理解的錯誤狀態。
+- **LLM gateway**：Android App 只保存 backend endpoint；LLM provider key 放在 Flask backend 環境變數，避免 key 進入 APK。
 
 ## 日期格式
 
@@ -146,12 +155,14 @@ Nova 會從訊息中尋找日期。日期可以是完整訊息，也可以夾在
 | `ApodMapperTest` | APOD DTO 轉 Domain model |
 | `FavoriteApodMapperTest` | 收藏 Entity / Domain model 轉換 |
 | `ApodRepositoryImplTest` | API date query、HTTP error mapping、IO error、retry 行為 |
+| `NovaGuideRepositoryImplTest` | Nova Guide endpoint 設定、DTO 驗證、網路錯誤 |
+| `ChatViewModelTest` | 對話流程、收藏 feedback、Nova Guide repository delegation |
 
 目前結果：
 
 ```text
 :app:testDebugUnitTest
-28 tests, 0 failures
+56 tests, 0 failures
 ```
 
 執行測試：
@@ -166,9 +177,23 @@ App 會從 `local.properties` 讀取 NASA API key：
 
 ```properties
 NASA_API_KEY=your_key_here
+NOVA_GUIDE_ENDPOINT=http://10.0.2.2:5050/v1/apod-guide
 ```
 
 若沒有設定，會使用 NASA 的 `DEMO_KEY`，可讓專案在 fresh checkout 後仍能 build，但請求限制較嚴格。
+
+`NOVA_GUIDE_ENDPOINT` 是選填；未設定時 App 仍可使用 APOD、收藏與星空卡，Nova Guide 會提示尚未設定 endpoint。若要啟用 AI 解說，先啟動 backend：
+
+```powershell
+cd nova-guide-backend
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+$env:GROQ_API_KEY="gsk-your-key"
+python app.py
+```
+
+Android emulator 連本機 backend 時使用 `10.0.2.2`；實體手機測試時，請把手機與電腦連到同一個 Wi-Fi，並將 endpoint 改成電腦 LAN IP，例如 `http://192.168.1.20:5050/v1/apod-guide`。正式展示建議部署到 HTTPS endpoint。
 
 ## 建置方式
 
@@ -196,12 +221,12 @@ app/build/outputs/apk/debug/app-debug.apk
 - 影片 APOD 外部連結處理。
 - Repository transient error retry。
 - 核心資料層 unit tests。
+- Nova Guide：LLM structured JSON gateway、繁中解說 / NASA 原文切換。
+- 生日星空卡圖片合成與分享。
 - Notion Kanban 開發流程看板預留。
 
 ## 後續可改進
 
-- 補上 ViewModel tests，驗證完整對話與收藏流程。
 - 補上 Room in-memory DAO tests。
-- 增加離線 APOD cache，和使用者主動收藏分開保存。
-- 增加分享用星空卡片圖片。
+- 將 Nova Guide backend 部署到雲端 HTTPS endpoint。
 - 補上正式截圖與操作錄影連結。

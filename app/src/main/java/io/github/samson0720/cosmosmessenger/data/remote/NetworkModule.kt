@@ -13,6 +13,7 @@ import java.util.concurrent.TimeUnit
 object NetworkModule {
 
     private const val BASE_URL = "https://api.nasa.gov/"
+    private const val NOVA_GUIDE_BASE_URL = "https://nova-guide.local/"
 
     // Chat-style UX: keep waits short. 10s connect covers slow TLS on a
     // rough network; 12s read gives NASA APOD a little extra grace since
@@ -40,5 +41,16 @@ object NetworkModule {
             .build()
     }
 
+    private val novaGuideRetrofit: Retrofit by lazy {
+        Retrofit.Builder()
+            .baseUrl(NOVA_GUIDE_BASE_URL)
+            .client(okHttp)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+    }
+
     val apodService: ApodService by lazy { retrofit.create(ApodService::class.java) }
+    val novaGuideService: NovaGuideService by lazy {
+        novaGuideRetrofit.create(NovaGuideService::class.java)
+    }
 }
