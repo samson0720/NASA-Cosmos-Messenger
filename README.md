@@ -11,7 +11,6 @@
 
 ## App Preview
 
-核心操作流程以大圖呈現，避免需要額外點開才能看清楚。
 
 <table>
   <tr>
@@ -40,8 +39,8 @@
     <td align="center" width="50%"><img src="./docs/readme-assets/star-card-preview.png" width="320" alt="Birthday star card preview" /></td>
   </tr>
   <tr>
-    <td align="center"><b>看圖解說</b><br />把 NASA 原文轉成繁中白話說明，並保留原文切換。</td>
-    <td align="center"><b>生日星空卡預覽</b><br />用生日日期對應 APOD 與星座模板。</td>
+    <td align="center"><b>看圖解說</b><br />把 NASA 原文轉成白話說明，並保留原文切換。</td>
+    <td align="center"><b>生日星空卡預覽</b><br />可以在Nova或收藏頁面生成 </td>
   </tr>
   <tr>
     <td align="center" width="50%"><img src="./docs/readme-assets/star-card-result.jpg" width="320" alt="Generated birthday star card" /></td>
@@ -181,4 +180,4 @@ app/build/outputs/apk/debug/app-debug.apk
 ## Project Links
 
 - [Notion Kanban](https://www.notion.so/347315bb151b8088a834e39b7f4ca209?v=347315bb151b8014b4db000c452f293f)
-- Demo video: pending
+- [Demo video](https://youtu.be/OB3Bx7gs-iE?si=Tt5XeXULb63X-uPm) 
