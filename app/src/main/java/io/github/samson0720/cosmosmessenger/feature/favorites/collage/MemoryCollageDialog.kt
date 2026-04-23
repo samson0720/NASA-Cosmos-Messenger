@@ -4,12 +4,10 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,9 +23,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -106,18 +104,21 @@ private fun TemplateSelectionDialog(
                     title = stringResource(R.string.collage_template_polaroid_orbit),
                     body = stringResource(R.string.collage_template_polaroid_orbit_body),
                     accent = Color(0xFFECDCAA),
+                    previewResId = R.drawable.collage_template_polaroid_orbit,
                     onClick = { onTemplateSelected(MemoryCollageTemplate.PolaroidOrbit) },
                 )
                 TemplateChoiceCard(
                     title = stringResource(R.string.collage_template_mission_board),
                     body = stringResource(R.string.collage_template_mission_board_body),
                     accent = Color(0xFF2D5F9A),
+                    previewResId = R.drawable.collage_template_mission_board,
                     onClick = { onTemplateSelected(MemoryCollageTemplate.MissionBoard) },
                 )
                 TemplateChoiceCard(
                     title = stringResource(R.string.collage_template_celestial_journal),
                     body = stringResource(R.string.collage_template_celestial_journal_body),
                     accent = Color(0xFFD8B36A),
+                    previewResId = R.drawable.collage_template_celestial_journal,
                     onClick = { onTemplateSelected(MemoryCollageTemplate.CelestialJournal) },
                 )
             }
@@ -136,6 +137,7 @@ private fun TemplateChoiceCard(
     title: String,
     body: String,
     accent: Color,
+    previewResId: Int,
     onClick: () -> Unit,
 ) {
     Surface(
@@ -152,17 +154,18 @@ private fun TemplateChoiceCard(
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(width = 52.dp, height = 78.dp),
-                contentAlignment = Alignment.Center,
+            Surface(
+                modifier = Modifier.size(width = 52.dp, height = 78.dp),
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                border = BorderStroke(1.dp, accent.copy(alpha = 0.7f)),
             ) {
-                Surface(
-                    modifier = Modifier.size(width = 42.dp, height = 68.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    color = accent.copy(alpha = 0.18f),
-                    border = BorderStroke(1.dp, accent.copy(alpha = 0.7f)),
-                ) {}
+                Image(
+                    painter = painterResource(previewResId),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(width = 52.dp, height = 78.dp),
+                )
             }
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
