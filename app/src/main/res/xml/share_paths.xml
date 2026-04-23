@@ -3,4 +3,7 @@
     <cache-path
         name="star_cards"
         path="star_cards/" />
+    <cache-path
+        name="memory_collages"
+        path="memory_collages/" />
 </paths>

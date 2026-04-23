@@ -65,6 +65,30 @@
     <string name="favorites_empty_title">還沒有收藏</string>
     <string name="favorites_empty_body">回到 Nova，長按一張 NASA APOD 卡片即可加入收藏。</string>
 
+    <!-- Favorites collage -->
+    <string name="collage_selection_title">製作 APOD 回憶拼貼</string>
+    <string name="collage_selection_count">%1$d/%2$d 張已選</string>
+    <string name="collage_create_cta">開始製作</string>
+    <string name="collage_image_only">拼貼只能選擇圖片 APOD。</string>
+    <string name="collage_max_selected">最多只能選 3 張圖片。</string>
+    <string name="collage_video_not_supported">影片不可選</string>
+    <string name="collage_selected_mark">已選</string>
+    <string name="collage_dialog_title">APOD 回憶拼貼</string>
+    <string name="collage_template_title">選擇拼貼模板</string>
+    <string name="collage_template_polaroid_orbit">模板 A：星軌拍立得</string>
+    <string name="collage_template_polaroid_orbit_body">斜放拍立得、藍色宇宙與復古 NASA 氛圍。</string>
+    <string name="collage_template_mission_board">模板 B：APOD 任務板</string>
+    <string name="collage_template_mission_board_body">深藍星圖、三段式任務看板與星座標記。</string>
+    <string name="collage_template_celestial_journal">模板 C：星象手帳</string>
+    <string name="collage_template_celestial_journal_body">紙感手帳、膠帶貼紙與三張記憶照片。</string>
+    <string name="collage_generating">正在生成拼貼預覽...</string>
+    <string name="collage_error">無法生成拼貼，請確認 3 張收藏圖片都能載入後再試一次。</string>
+    <string name="collage_share">分享</string>
+    <string name="collage_close">關閉</string>
+    <string name="collage_share_title">分享 APOD 回憶拼貼</string>
+    <string name="collage_share_text">我的 NASA APOD 回憶拼貼</string>
+    <string name="collage_preview_description">APOD 回憶拼貼預覽</string>
+
     <!-- Stub screen text (replaced by real screens in later commits) -->
     <string name="stub_favorites">Favorites — coming next</string>
 </resources>

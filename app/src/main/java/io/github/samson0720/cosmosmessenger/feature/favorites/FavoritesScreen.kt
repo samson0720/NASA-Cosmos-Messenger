@@ -1,8 +1,10 @@
 package io.github.samson0720.cosmosmessenger.feature.favorites
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -59,6 +62,11 @@ import io.github.samson0720.cosmosmessenger.feature.chat.starcard.BirthdayCardDi
 import io.github.samson0720.cosmosmessenger.feature.chat.starcard.BirthdayCardDialogState
 import io.github.samson0720.cosmosmessenger.feature.chat.starcard.BirthdayCardShareHelper
 import io.github.samson0720.cosmosmessenger.feature.chat.starcard.BirthdayStarCardRenderer
+import io.github.samson0720.cosmosmessenger.feature.favorites.collage.FavoriteCollageRenderer
+import io.github.samson0720.cosmosmessenger.feature.favorites.collage.MemoryCollageDialog
+import io.github.samson0720.cosmosmessenger.feature.favorites.collage.MemoryCollageDialogState
+import io.github.samson0720.cosmosmessenger.feature.favorites.collage.MemoryCollageShareHelper
+import io.github.samson0720.cosmosmessenger.feature.favorites.collage.MemoryCollageTemplate
 import io.github.samson0720.cosmosmessenger.ui.CosmosTopBar
 import io.github.samson0720.cosmosmessenger.ui.theme.CosmosMessengerTheme
 import java.time.LocalDate
@@ -73,6 +81,9 @@ fun FavoritesRoute(
     FavoritesScreen(
         uiState = uiState,
         onDeleteClick = viewModel::onDeleteClick,
+        onFavoriteLongPress = viewModel::onFavoriteLongPress,
+        onFavoriteClickInSelection = viewModel::onFavoriteClickInSelection,
+        onCancelCollageSelection = viewModel::cancelCollageSelection,
         onSnackbarShown = viewModel::consumeSnackbar,
         modifier = modifier,
     )
@@ -82,6 +93,9 @@ fun FavoritesRoute(
 fun FavoritesScreen(
     uiState: FavoritesUiState,
     onDeleteClick: (LocalDate) -> Unit,
+    onFavoriteLongPress: (LocalDate) -> Unit,
+    onFavoriteClickInSelection: (LocalDate) -> Unit,
+    onCancelCollageSelection: () -> Unit,
     onSnackbarShown: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -92,8 +106,17 @@ fun FavoritesScreen(
     val renderer = remember(context.applicationContext) {
         BirthdayStarCardRenderer(context.applicationContext)
     }
+    val collageRenderer = remember(context.applicationContext) {
+        FavoriteCollageRenderer(context.applicationContext)
+    }
     var birthdayCardState by remember {
         mutableStateOf<BirthdayCardDialogState?>(null)
+    }
+    var collageDialogState by remember {
+        mutableStateOf<MemoryCollageDialogState?>(null)
+    }
+    var collageApods by remember {
+        mutableStateOf<List<Apod>>(emptyList())
     }
     val onBirthdayCardClick: (FavoriteApodUiItem) -> Unit = onBirthdayCardClick@ { item ->
         if (item.mediaType != ApodMediaType.IMAGE) return@onBirthdayCardClick
@@ -104,6 +127,25 @@ fun FavoritesScreen(
                     onSuccess = { BirthdayCardDialogState.Ready(it) },
                     onFailure = { BirthdayCardDialogState.Error },
                 )
+        }
+    }
+    val onCreateCollageClick: () -> Unit = {
+        if (uiState.canCreateCollage) {
+            collageApods = uiState.selectedCollageItems.map { it.apod }
+            collageDialogState = MemoryCollageDialogState.TemplateSelection
+        }
+    }
+    val onTemplateSelected: (MemoryCollageTemplate) -> Unit = { template ->
+        val apods = collageApods
+        if (apods.size == FavoritesUiState.MaxCollageSelection) {
+            collageDialogState = MemoryCollageDialogState.Loading
+            scope.launch {
+                collageDialogState = runCatching { collageRenderer.render(apods, template) }
+                    .fold(
+                        onSuccess = { MemoryCollageDialogState.Ready(it) },
+                        onFailure = { MemoryCollageDialogState.Error },
+                    )
+            }
         }
     }
 
@@ -122,7 +164,16 @@ fun FavoritesScreen(
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        CosmosTopBar(title = stringResource(R.string.tab_favorites))
+        if (uiState.isCollageSelectionMode) {
+            CollageSelectionTopBar(
+                selectedCount = uiState.selectedCollageCount,
+                canCreateCollage = uiState.canCreateCollage,
+                onCancel = onCancelCollageSelection,
+                onCreateCollageClick = onCreateCollageClick,
+            )
+        } else {
+            CosmosTopBar(title = stringResource(R.string.tab_favorites))
+        }
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -140,7 +191,11 @@ fun FavoritesScreen(
                 else -> FavoritesGrid(
                     items = uiState.items,
                     deletingDate = uiState.deletingDate,
+                    isCollageSelectionMode = uiState.isCollageSelectionMode,
+                    selectedDates = uiState.selectedCollageDates,
                     onDeleteClick = onDeleteClick,
+                    onFavoriteLongPress = onFavoriteLongPress,
+                    onFavoriteClickInSelection = onFavoriteClickInSelection,
                     onBirthdayCardClick = onBirthdayCardClick,
                 )
             }
@@ -155,13 +210,71 @@ fun FavoritesScreen(
             onShare = { card -> BirthdayCardShareHelper.share(context, card) },
         )
     }
+
+    collageDialogState?.let { state ->
+        MemoryCollageDialog(
+            state = state,
+            onDismiss = { collageDialogState = null },
+            onTemplateSelected = onTemplateSelected,
+            onShare = { collage -> MemoryCollageShareHelper.share(context, collage) },
+        )
+    }
+}
+
+@Composable
+private fun CollageSelectionTopBar(
+    selectedCount: Int,
+    canCreateCollage: Boolean,
+    onCancel: () -> Unit,
+    onCreateCollageClick: () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.collage_selection_title),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = Color.White,
+                )
+                Text(
+                    text = stringResource(
+                        R.string.collage_selection_count,
+                        selectedCount,
+                        FavoritesUiState.MaxCollageSelection,
+                    ),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.White.copy(alpha = 0.72f),
+                )
+            }
+            TextButton(onClick = onCancel) {
+                Text(stringResource(android.R.string.cancel))
+            }
+            Button(
+                enabled = canCreateCollage,
+                onClick = onCreateCollageClick,
+            ) {
+                Text(stringResource(R.string.collage_create_cta))
+            }
+        }
+        androidx.compose.material3.HorizontalDivider(thickness = 0.5.dp, color = Color(0x1AFFFFFF))
+    }
 }
 
 @Composable
 private fun FavoritesGrid(
     items: List<FavoriteApodUiItem>,
     deletingDate: LocalDate?,
+    isCollageSelectionMode: Boolean,
+    selectedDates: Set<LocalDate>,
     onDeleteClick: (LocalDate) -> Unit,
+    onFavoriteLongPress: (LocalDate) -> Unit,
+    onFavoriteClickInSelection: (LocalDate) -> Unit,
     onBirthdayCardClick: (FavoriteApodUiItem) -> Unit,
 ) {
     val uriHandler = LocalUriHandler.current
@@ -176,26 +289,41 @@ private fun FavoritesGrid(
             FavoriteCard(
                 item = item,
                 isDeleting = deletingDate == item.date,
+                isCollageSelectionMode = isCollageSelectionMode,
+                isSelectedForCollage = item.date in selectedDates,
                 onDeleteClick = onDeleteClick,
                 onBirthdayCardClick = { onBirthdayCardClick(item) },
+                onFavoriteLongPress = { onFavoriteLongPress(item.date) },
+                onFavoriteClickInSelection = { onFavoriteClickInSelection(item.date) },
                 onClick = { uriHandler.openUri(item.sourceUrl) },
             )
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun FavoriteCard(
     item: FavoriteApodUiItem,
     isDeleting: Boolean,
+    isCollageSelectionMode: Boolean,
+    isSelectedForCollage: Boolean,
     onDeleteClick: (LocalDate) -> Unit,
     onBirthdayCardClick: () -> Unit,
+    onFavoriteLongPress: () -> Unit,
+    onFavoriteClickInSelection: () -> Unit,
     onClick: () -> Unit,
 ) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = !isDeleting, onClick = onClick),
+            .combinedClickable(
+                enabled = !isDeleting,
+                onClick = {
+                    if (isCollageSelectionMode) onFavoriteClickInSelection() else onClick()
+                },
+                onLongClick = onFavoriteLongPress,
+            ),
         shape = RoundedCornerShape(16.dp),
         color = FavoriteCardColor,
         contentColor = Color.White,
@@ -213,13 +341,20 @@ private fun FavoriteCard(
                             .height(122.dp),
                     )
                 }
-                DeleteBadge(
-                    enabled = !isDeleting,
-                    onClick = { onDeleteClick(item.date) },
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp),
-                )
+                if (isCollageSelectionMode) {
+                    CollageSelectionOverlay(
+                        isSelected = isSelectedForCollage,
+                        isEligible = item.isCollageEligible,
+                    )
+                } else {
+                    DeleteBadge(
+                        enabled = !isDeleting,
+                        onClick = { onDeleteClick(item.date) },
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(8.dp),
+                    )
+                }
             }
             Column(modifier = Modifier.padding(10.dp)) {
                 Text(
@@ -245,13 +380,63 @@ private fun FavoriteCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (item.mediaType == ApodMediaType.IMAGE) {
+                if (!isCollageSelectionMode && item.mediaType == ApodMediaType.IMAGE) {
                     Spacer(Modifier.height(4.dp))
                     BirthdayCardAction(
                         enabled = !isDeleting,
                         onClick = onBirthdayCardClick,
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CollageSelectionOverlay(
+    isSelected: Boolean,
+    isEligible: Boolean,
+) {
+    val overlayColor = when {
+        isSelected -> Color(0x6636D399)
+        isEligible -> Color(0x33000000)
+        else -> Color(0x99000000)
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(122.dp)
+            .background(overlayColor),
+    ) {
+        if (isSelected) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp),
+                shape = CircleShape,
+                color = Color(0xFF36D399),
+                contentColor = Color(0xFF06111A),
+            ) {
+                Text(
+                    text = stringResource(R.string.collage_selected_mark),
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                )
+            }
+        } else if (!isEligible) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(8.dp),
+                shape = RoundedCornerShape(50),
+                color = Color(0xCC000000),
+                contentColor = Color.White,
+            ) {
+                Text(
+                    text = stringResource(R.string.collage_video_not_supported),
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                )
             }
         }
     }
@@ -368,6 +553,9 @@ private fun FavoritesScreenPreview() {
                 isLoading = false,
             ),
             onDeleteClick = {},
+            onFavoriteLongPress = {},
+            onFavoriteClickInSelection = {},
+            onCancelCollageSelection = {},
             onSnackbarShown = {},
         )
     }

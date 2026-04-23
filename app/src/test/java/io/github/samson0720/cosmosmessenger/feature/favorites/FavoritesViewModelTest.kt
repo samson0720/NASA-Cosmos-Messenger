@@ -116,6 +116,120 @@ class FavoritesViewModelTest {
         assertNull(viewModel.uiState.value.snackbarMessage)
     }
 
+    @Test
+    fun onFavoriteLongPress_image_entersSelectionModeAndSelectsFirstItem() {
+        val favorite = sampleFavorite(date = LocalDate.of(2024, 1, 2))
+        val viewModel = newViewModel(
+            repository = FakeFavoritesRepository(initialFavorites = listOf(favorite)),
+        )
+
+        viewModel.onFavoriteLongPress(favorite.apod.date)
+
+        val state = viewModel.uiState.value
+        assertTrue(state.isCollageSelectionMode)
+        assertEquals(setOf(favorite.apod.date), state.selectedCollageDates)
+        assertEquals(1, state.selectedCollageCount)
+        assertFalse(state.canCreateCollage)
+    }
+
+    @Test
+    fun onFavoriteLongPress_video_doesNotEnterSelectionModeAndShowsHint() {
+        val favorite = sampleFavorite(
+            date = LocalDate.of(2024, 1, 2),
+            mediaType = ApodMediaType.VIDEO,
+        )
+        val viewModel = newViewModel(
+            repository = FakeFavoritesRepository(initialFavorites = listOf(favorite)),
+        )
+
+        viewModel.onFavoriteLongPress(favorite.apod.date)
+
+        val state = viewModel.uiState.value
+        assertFalse(state.isCollageSelectionMode)
+        assertTrue(state.selectedCollageDates.isEmpty())
+        assertEquals(stringFor(R.string.collage_image_only), state.snackbarMessage)
+    }
+
+    @Test
+    fun onFavoriteClickInSelection_togglesSelectedImage() {
+        val first = sampleFavorite(date = LocalDate.of(2024, 1, 1))
+        val second = sampleFavorite(date = LocalDate.of(2024, 1, 2))
+        val viewModel = newViewModel(
+            repository = FakeFavoritesRepository(initialFavorites = listOf(first, second)),
+        )
+        viewModel.onFavoriteLongPress(first.apod.date)
+
+        viewModel.onFavoriteClickInSelection(second.apod.date)
+        assertEquals(
+            setOf(first.apod.date, second.apod.date),
+            viewModel.uiState.value.selectedCollageDates,
+        )
+
+        viewModel.onFavoriteClickInSelection(second.apod.date)
+        assertEquals(setOf(first.apod.date), viewModel.uiState.value.selectedCollageDates)
+    }
+
+    @Test
+    fun onFavoriteClickInSelection_blocksSelectingMoreThanThree() {
+        val favorites = (1..4).map { day ->
+            sampleFavorite(date = LocalDate.of(2024, 1, day))
+        }
+        val viewModel = newViewModel(
+            repository = FakeFavoritesRepository(initialFavorites = favorites),
+        )
+        viewModel.onFavoriteLongPress(favorites[0].apod.date)
+        viewModel.onFavoriteClickInSelection(favorites[1].apod.date)
+        viewModel.onFavoriteClickInSelection(favorites[2].apod.date)
+
+        viewModel.onFavoriteClickInSelection(favorites[3].apod.date)
+
+        val state = viewModel.uiState.value
+        assertEquals(
+            setOf(
+                favorites[0].apod.date,
+                favorites[1].apod.date,
+                favorites[2].apod.date,
+            ),
+            state.selectedCollageDates,
+        )
+        assertEquals(stringFor(R.string.collage_max_selected), state.snackbarMessage)
+    }
+
+    @Test
+    fun canCreateCollage_isEnabledOnlyAtThreeSelectedImages() {
+        val favorites = (1..3).map { day ->
+            sampleFavorite(date = LocalDate.of(2024, 1, day))
+        }
+        val viewModel = newViewModel(
+            repository = FakeFavoritesRepository(initialFavorites = favorites),
+        )
+
+        viewModel.onFavoriteLongPress(favorites[0].apod.date)
+        assertFalse(viewModel.uiState.value.canCreateCollage)
+
+        viewModel.onFavoriteClickInSelection(favorites[1].apod.date)
+        assertFalse(viewModel.uiState.value.canCreateCollage)
+
+        viewModel.onFavoriteClickInSelection(favorites[2].apod.date)
+        assertTrue(viewModel.uiState.value.canCreateCollage)
+        assertEquals(3, viewModel.uiState.value.selectedCollageItems.size)
+    }
+
+    @Test
+    fun cancelCollageSelection_clearsSelectedItems() {
+        val favorite = sampleFavorite(date = LocalDate.of(2024, 1, 2))
+        val viewModel = newViewModel(
+            repository = FakeFavoritesRepository(initialFavorites = listOf(favorite)),
+        )
+        viewModel.onFavoriteLongPress(favorite.apod.date)
+
+        viewModel.cancelCollageSelection()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.isCollageSelectionMode)
+        assertTrue(state.selectedCollageDates.isEmpty())
+    }
+
     private fun newViewModel(
         repository: FakeFavoritesRepository = FakeFavoritesRepository(),
     ): FavoritesViewModel = FavoritesViewModel(

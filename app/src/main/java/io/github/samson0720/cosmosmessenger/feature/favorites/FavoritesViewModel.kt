@@ -27,8 +27,25 @@ data class FavoritesUiState(
     val items: List<FavoriteApodUiItem> = emptyList(),
     val isLoading: Boolean = true,
     val deletingDate: LocalDate? = null,
+    val selectedCollageDates: Set<LocalDate> = emptySet(),
     val snackbarMessage: String? = null,
-)
+) {
+    val isCollageSelectionMode: Boolean
+        get() = selectedCollageDates.isNotEmpty()
+
+    val selectedCollageCount: Int
+        get() = selectedCollageDates.size
+
+    val canCreateCollage: Boolean
+        get() = selectedCollageDates.size == MaxCollageSelection
+
+    val selectedCollageItems: List<FavoriteApodUiItem>
+        get() = items.filter { it.date in selectedCollageDates }
+
+    companion object {
+        const val MaxCollageSelection = 3
+    }
+}
 
 data class FavoriteApodUiItem(
     val apod: Apod,
@@ -40,7 +57,10 @@ data class FavoriteApodUiItem(
     val mediaType: ApodMediaType,
     val imageUrl: String?,
     val sourceUrl: String,
-)
+) {
+    val isCollageEligible: Boolean
+        get() = mediaType == ApodMediaType.IMAGE
+}
 
 fun interface FavoritesStringProvider {
     fun getString(resId: Int): String
@@ -73,10 +93,15 @@ class FavoritesViewModel(
                     }
                 }
                 .collect { favorites ->
+                    val items = favorites.map { favorite -> favorite.toUiItem() }
                     _uiState.update {
+                        val validSelectedDates = it.selectedCollageDates
+                            .filter { date -> items.any { item -> item.date == date && item.isCollageEligible } }
+                            .toSet()
                         it.copy(
-                            items = favorites.map { favorite -> favorite.toUiItem() },
+                            items = items,
                             isLoading = false,
+                            selectedCollageDates = validSelectedDates,
                         )
                     }
                 }
@@ -84,7 +109,7 @@ class FavoritesViewModel(
     }
 
     fun onDeleteClick(date: LocalDate) {
-        if (_uiState.value.deletingDate != null) return
+        if (_uiState.value.deletingDate != null || _uiState.value.isCollageSelectionMode) return
 
         viewModelScope.launch {
             _uiState.update { it.copy(deletingDate = date) }
@@ -106,6 +131,56 @@ class FavoritesViewModel(
                     }
                 }
         }
+    }
+
+    fun onFavoriteLongPress(date: LocalDate) {
+        val item = _uiState.value.items.firstOrNull { it.date == date } ?: return
+        if (!item.isCollageEligible) {
+            _uiState.update {
+                it.copy(snackbarMessage = appString(R.string.collage_image_only))
+            }
+            return
+        }
+        _uiState.update {
+            it.copy(selectedCollageDates = setOf(date))
+        }
+    }
+
+    fun onFavoriteClickInSelection(date: LocalDate) {
+        val state = _uiState.value
+        if (!state.isCollageSelectionMode) return
+
+        val item = state.items.firstOrNull { it.date == date } ?: return
+        if (!item.isCollageEligible) {
+            _uiState.update {
+                it.copy(snackbarMessage = appString(R.string.collage_image_only))
+            }
+            return
+        }
+
+        _uiState.update {
+            val selected = it.selectedCollageDates
+            val nextSelected = when {
+                date in selected -> selected - date
+                selected.size >= FavoritesUiState.MaxCollageSelection -> selected
+                else -> selected + date
+            }
+            it.copy(
+                selectedCollageDates = nextSelected,
+                snackbarMessage = if (
+                    date !in selected &&
+                    selected.size >= FavoritesUiState.MaxCollageSelection
+                ) {
+                    appString(R.string.collage_max_selected)
+                } else {
+                    it.snackbarMessage
+                },
+            )
+        }
+    }
+
+    fun cancelCollageSelection() {
+        _uiState.update { it.copy(selectedCollageDates = emptySet()) }
     }
 
     fun consumeSnackbar() {
