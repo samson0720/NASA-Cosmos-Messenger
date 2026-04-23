@@ -21,6 +21,7 @@ object DatabaseModule {
                 DB_NAME,
             )
                 .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_2_3)
                 .build()
                 .also { instance = it }
         }
@@ -38,6 +39,30 @@ object DatabaseModule {
                     `hdUrl` TEXT,
                     `cachedAt` INTEGER NOT NULL,
                     PRIMARY KEY(`date`)
+                )
+                """.trimIndent(),
+            )
+        }
+    }
+
+    private val MIGRATION_2_3 = object : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `chat_message` (
+                    `id` TEXT NOT NULL,
+                    `sortOrder` INTEGER NOT NULL,
+                    `sender` TEXT NOT NULL,
+                    `contentType` TEXT NOT NULL,
+                    `text` TEXT,
+                    `apodDate` TEXT,
+                    `apodTitle` TEXT,
+                    `apodExplanation` TEXT,
+                    `apodMediaType` TEXT,
+                    `apodUrl` TEXT,
+                    `apodHdUrl` TEXT,
+                    `apodSource` TEXT,
+                    PRIMARY KEY(`id`)
                 )
                 """.trimIndent(),
             )

@@ -15,7 +15,9 @@ import io.github.samson0720.cosmosmessenger.data.NovaGuideRepository
 import io.github.samson0720.cosmosmessenger.data.NovaGuideRepositoryImpl
 import io.github.samson0720.cosmosmessenger.data.local.DatabaseModule
 import io.github.samson0720.cosmosmessenger.data.remote.NetworkModule
+import io.github.samson0720.cosmosmessenger.data.repository.ChatHistoryRepository
 import io.github.samson0720.cosmosmessenger.data.repository.FavoritesRepositoryImpl
+import io.github.samson0720.cosmosmessenger.data.repository.RoomChatHistoryRepository
 import io.github.samson0720.cosmosmessenger.domain.model.Apod
 import io.github.samson0720.cosmosmessenger.domain.model.ApodMediaType
 import io.github.samson0720.cosmosmessenger.domain.model.ApodSource
@@ -71,6 +73,7 @@ class ChatViewModel(
     private val repository: ApodRepository,
     private val novaGuideRepository: NovaGuideRepository,
     private val favoritesRepository: FavoritesRepository,
+    private val chatHistoryRepository: ChatHistoryRepository? = null,
     private val stringProvider: ChatStringProvider = AndroidChatStringProvider(application),
 ) : AndroidViewModel(application) {
 
@@ -86,6 +89,10 @@ class ChatViewModel(
         ),
     )
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
+
+    init {
+        restoreChatHistory()
+    }
 
     fun onInputChange(text: String) {
         _uiState.update { it.copy(inputText = text) }
@@ -120,12 +127,15 @@ class ChatViewModel(
 
         viewModelScope.launch {
             val replies = buildRepliesFor(text)
+            var persistedMessages: List<ChatMessage> = emptyList()
             _uiState.update {
+                persistedMessages = it.messages + replies
                 it.copy(
-                    messages = it.messages + replies,
+                    messages = persistedMessages,
                     isSending = false,
                 )
             }
+            persistChatHistory(persistedMessages)
         }
     }
 
@@ -242,6 +252,21 @@ class ChatViewModel(
         content = ChatContent.Text(stringProvider.getString(resId)),
     )
 
+    private fun restoreChatHistory() {
+        val historyRepository = chatHistoryRepository ?: return
+        viewModelScope.launch {
+            val restored = runCatching { historyRepository.load() }.getOrDefault(emptyList())
+            if (restored.isNotEmpty()) {
+                _uiState.update { it.copy(messages = restored) }
+            }
+        }
+    }
+
+    private suspend fun persistChatHistory(messages: List<ChatMessage>) {
+        val historyRepository = chatHistoryRepository ?: return
+        runCatching { historyRepository.replace(messages) }
+    }
+
     private fun newId(): String = UUID.randomUUID().toString()
 
     companion object {
@@ -262,7 +287,16 @@ class ChatViewModel(
                 val favoritesRepository = FavoritesRepositoryImpl(
                     dao = database.favoriteApodDao(),
                 )
-                ChatViewModel(app, apodRepository, novaGuideRepository, favoritesRepository)
+                val chatHistoryRepository = RoomChatHistoryRepository(
+                    dao = database.chatMessageDao(),
+                )
+                ChatViewModel(
+                    app,
+                    apodRepository,
+                    novaGuideRepository,
+                    favoritesRepository,
+                    chatHistoryRepository,
+                )
             }
         }
     }
