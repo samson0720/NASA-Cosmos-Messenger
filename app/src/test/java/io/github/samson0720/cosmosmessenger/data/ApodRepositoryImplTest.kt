@@ -147,9 +147,9 @@ class ApodRepositoryImplTest {
     }
 
     @Test
-    fun getApod_unknownHostWithCachedDate_returnsCachedApod() = runTest {
+    fun getApod_cachedDate_returnsCachedApodWithoutNetworkCall() = runTest {
         val service = FakeApodService {
-            throw UnknownHostException("offline")
+            throw AssertionError("Network should not be called on cache hit")
         }
         val cache = FakeCachedApodDao(
             initialRows = listOf(
@@ -175,7 +175,7 @@ class ApodRepositoryImplTest {
         assertEquals("https://example.com/cached.jpg", apod.url)
         assertEquals("https://example.com/cached-hd.jpg", apod.hdUrl)
         assertEquals(ApodSource.CACHE, apod.source)
-        assertEquals(1, service.calls.size)
+        assertEquals(0, service.calls.size)
         assertEquals(listOf("2024-01-02"), cache.lookups)
     }
 

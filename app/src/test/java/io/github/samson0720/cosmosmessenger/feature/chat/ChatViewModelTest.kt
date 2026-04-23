@@ -5,7 +5,6 @@ import io.github.samson0720.cosmosmessenger.MainDispatcherRule
 import io.github.samson0720.cosmosmessenger.R
 import io.github.samson0720.cosmosmessenger.data.ApodRepository
 import io.github.samson0720.cosmosmessenger.data.NovaGuideRepository
-import io.github.samson0720.cosmosmessenger.data.repository.ChatHistoryRepository
 import io.github.samson0720.cosmosmessenger.domain.model.Apod
 import io.github.samson0720.cosmosmessenger.domain.model.ApodMediaType
 import io.github.samson0720.cosmosmessenger.domain.model.ApodSource
@@ -49,28 +48,6 @@ class ChatViewModelTest {
     }
 
     @Test
-    fun init_withSavedChatHistory_restoresMessages() {
-        val restoredMessages = listOf(
-            ChatMessage(
-                id = "saved-user-message",
-                sender = Sender.User,
-                content = ChatContent.Text("show me 2024-01-02"),
-            ),
-            ChatMessage(
-                id = "saved-nova-message",
-                sender = Sender.Nova,
-                content = ChatContent.Text("string-${R.string.nova_date_intro}"),
-            ),
-        )
-        val historyRepository = FakeChatHistoryRepository(restoredMessages = restoredMessages)
-
-        val viewModel = newViewModel(chatHistoryRepository = historyRepository)
-
-        assertEquals(restoredMessages, viewModel.uiState.value.messages)
-        assertEquals(1, historyRepository.loadCalls)
-    }
-
-    @Test
     fun onSendClick_withoutDate_callsRepositoryWithNullAndAppendsApodReply() = runTest {
         val apod = sampleApod()
         val repository = FakeApodRepository(Result.success(apod))
@@ -102,27 +79,6 @@ class ChatViewModelTest {
         assertApodCardMatches(apodContent.card, apod)
         assertFalse(apodContent.card.isFromCache)
         assertSame(apod, apodContent.payload)
-    }
-
-    @Test
-    fun onSendClick_success_persistsFinalMessagesToChatHistory() = runTest {
-        val apod = sampleApod(date = LocalDate.of(2024, 1, 2))
-        val repository = FakeApodRepository(Result.success(apod))
-        val historyRepository = FakeChatHistoryRepository()
-        val viewModel = newViewModel(
-            repository = repository,
-            chatHistoryRepository = historyRepository,
-        )
-
-        viewModel.onInputChange("show me 2024/01/02")
-        viewModel.onSendClick()
-
-        val persistedMessages = historyRepository.replacements.single()
-        assertEquals(viewModel.uiState.value.messages, persistedMessages)
-        assertEquals(4, persistedMessages.size)
-        assertEquals(ChatContent.Text("show me 2024/01/02"), persistedMessages[1].content)
-        assertEquals(ChatContent.Text(stringFor(R.string.nova_date_intro)), persistedMessages[2].content)
-        assertTrue(persistedMessages.last().content is ChatContent.ApodImage)
     }
 
     @Test
@@ -251,13 +207,11 @@ class ChatViewModelTest {
         repository: FakeApodRepository = FakeApodRepository(),
         guideRepository: FakeNovaGuideRepository = FakeNovaGuideRepository(),
         favoritesRepository: FakeFavoritesRepository = FakeFavoritesRepository(),
-        chatHistoryRepository: ChatHistoryRepository? = null,
     ): ChatViewModel = ChatViewModel(
         application = Application(),
         repository = repository,
         novaGuideRepository = guideRepository,
         favoritesRepository = favoritesRepository,
-        chatHistoryRepository = chatHistoryRepository,
         stringProvider = ChatStringProvider { resId -> stringFor(resId) },
     )
 
@@ -340,23 +294,6 @@ class ChatViewModelTest {
         }
 
         override suspend fun delete(date: LocalDate) = Unit
-    }
-
-    private class FakeChatHistoryRepository(
-        private val restoredMessages: List<ChatMessage> = emptyList(),
-    ) : ChatHistoryRepository {
-        var loadCalls = 0
-            private set
-        val replacements = mutableListOf<List<ChatMessage>>()
-
-        override suspend fun load(): List<ChatMessage> {
-            loadCalls += 1
-            return restoredMessages
-        }
-
-        override suspend fun replace(messages: List<ChatMessage>) {
-            replacements += messages
-        }
     }
 
     private fun stringFor(resId: Int): String = "string-$resId"

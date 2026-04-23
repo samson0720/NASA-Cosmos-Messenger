@@ -8,7 +8,6 @@ import io.github.samson0720.cosmosmessenger.data.mapper.toDomain
 import io.github.samson0720.cosmosmessenger.data.remote.ApodDto
 import io.github.samson0720.cosmosmessenger.data.remote.ApodService
 import io.github.samson0720.cosmosmessenger.domain.model.Apod
-import retrofit2.HttpException
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
@@ -16,6 +15,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlin.coroutines.cancellation.CancellationException
+import retrofit2.HttpException
 
 private const val TAG = "ApodRepo"
 
@@ -25,33 +25,42 @@ class ApodRepositoryImpl(
     private val cacheDao: CachedApodDao? = null,
 ) : ApodRepository {
 
-    override suspend fun getApod(date: LocalDate?): Result<Apod> = try {
-        val dateParam = date?.format(DateTimeFormatter.ISO_LOCAL_DATE)
-        if (BuildConfig.DEBUG) Log.d(TAG, "request date=${dateParam ?: "today"}")
-        val dto = fetchWithOneRetry(dateParam)
-        val apod = dto.toDomain()
-        cache(apod)
-        Result.success(apod)
-    } catch (e: HttpException) {
-        if (BuildConfig.DEBUG) Log.w(TAG, "HTTP ${e.code()}")
-        Result.failure(
-            when (e.code()) {
-                429 -> ApodException.RateLimited
-                404 -> ApodException.NotFound
-                else -> ApodException.Unknown(e)
-            },
-        )
-    } catch (e: IOException) {
-        if (BuildConfig.DEBUG) Log.w(TAG, "IO ${e.javaClass.simpleName}")
-        cached(date)?.let { return Result.success(it) }
-        Result.failure(ApodException.Network)
-    } catch (e: CancellationException) {
-        // Keep structured concurrency intact — never convert cancellation
-        // into an error reply.
-        throw e
-    } catch (e: Throwable) {
-        if (BuildConfig.DEBUG) Log.w(TAG, "Unknown ${e.javaClass.simpleName}")
-        Result.failure(ApodException.Unknown(e))
+    override suspend fun getApod(date: LocalDate?): Result<Apod> {
+        cached(date)?.let { cachedApod ->
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "cache hit date=${cachedApod.date}")
+            }
+            return Result.success(cachedApod)
+        }
+
+        return try {
+            val dateParam = date?.format(DateTimeFormatter.ISO_LOCAL_DATE)
+            if (BuildConfig.DEBUG) Log.d(TAG, "request date=${dateParam ?: "today"}")
+            val dto = fetchWithOneRetry(dateParam)
+            val apod = dto.toDomain()
+            cache(apod)
+            Result.success(apod)
+        } catch (e: HttpException) {
+            if (BuildConfig.DEBUG) Log.w(TAG, "HTTP ${e.code()}")
+            Result.failure(
+                when (e.code()) {
+                    429 -> ApodException.RateLimited
+                    404 -> ApodException.NotFound
+                    else -> ApodException.Unknown(e)
+                },
+            )
+        } catch (e: IOException) {
+            if (BuildConfig.DEBUG) Log.w(TAG, "IO ${e.javaClass.simpleName}")
+            cached(date)?.let { return Result.success(it) }
+            Result.failure(ApodException.Network)
+        } catch (e: CancellationException) {
+            // Keep structured concurrency intact; never convert cancellation
+            // into an error reply.
+            throw e
+        } catch (e: Throwable) {
+            if (BuildConfig.DEBUG) Log.w(TAG, "Unknown ${e.javaClass.simpleName}")
+            Result.failure(ApodException.Unknown(e))
+        }
     }
 
     /**

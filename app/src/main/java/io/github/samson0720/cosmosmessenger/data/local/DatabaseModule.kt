@@ -22,6 +22,7 @@ object DatabaseModule {
             )
                 .addMigrations(MIGRATION_1_2)
                 .addMigrations(MIGRATION_2_3)
+                .addMigrations(MIGRATION_3_4)
                 .build()
                 .also { instance = it }
         }
@@ -66,6 +67,12 @@ object DatabaseModule {
                 )
                 """.trimIndent(),
             )
+        }
+    }
+
+    private val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("DROP TABLE IF EXISTS `chat_message`")
         }
     }
 }
