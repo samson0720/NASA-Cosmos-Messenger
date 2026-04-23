@@ -127,7 +127,7 @@
 | Bonus: Birthday star card | 使用生日 APOD 與星座模板生成可分享圖片 |
 | Bonus: Favorite collage | 從收藏選 3 張 image APOD，選模板，預覽並分享 |
 | CI / APK artifact | GitHub Actions 跑 unit tests、build debug APK、upload artifact |
-| Unit tests | 66 個 JVM unit tests，覆蓋核心規則與資料層 |
+| Unit tests | 80 個 JVM unit tests，覆蓋核心規則、資料層與 Room cache |
 
 ## External API Reliability
 
